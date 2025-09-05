@@ -1,0 +1,459 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="sidebar d-flex flex-column justify-content-start" id="sidebar" style="height: 100vh;">
+    <div>
+        <h5 style="padding: 10px; text-align: start; font-weight: bold;">Dash AI</h5>
+        <button class="toggle-btn" id="sidebar-toggle">
+            <i class="fa-solid fa-bars"></i>
+        </button>
+
+        <!-- Sidebar Buttons -->
+        <div class="d-flex flex-column gap-2 px-3 mt-4">
+            <button class="custom-btn w-100" id="chat-btn">
+                <i class="fa-solid fa-pen-to-square me-2"></i> New Chat
+            </button>
+            <button class="custom-btn w-100" id="models-btn">
+                <i class="fa fa-robot me-2"></i> My Models
+            </button>
+        </div>
+    </div>
+
+    <div class="mt-auto">
+        {% if not user_logged_in %}
+        <div class="px-3 pb-4">
+            <button class="btn btn-dark w-100 mb-2" id="login-btn">Login/Sign Up</button>
+        </div>
+        {% else %}
+        <div class="d-flex flex-direction-row align-items-center pb-4">
+            <img src="{{ user_image_url }}" alt="User Image" class="rounded-circle"
+                style="width: 60px; height: 60px; object-fit: cover; margin-bottom: 8px;">
+            <span style="font-weight: 500;">{{ username }}</span>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="content">
+    <div class="chat-box" id="chat-box">
+        {% if history %}
+        {% for message in history %}
+        <div class="chat-message user">{{ message.user }}</div>
+        <div class="chat-message bot">{{ message.bot|safe }}</div>
+        {% endfor %}
+        {% endif %}
+    </div>
+    <div class="chat-input">
+        <div class="input-group" style="max-width: 800px; width: 100%;">
+            <input type="text" class="form-control" placeholder="Type here..." id="user-input">
+            <button class="btn btn-dark" type="button" id="prompt-button">Send</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===== Overlay Login/Signup Modal ===== -->
+<div class="overlay" id="login-overlay">
+    <div class="card shadow-lg p-4">
+        <!-- LOGIN FORM -->
+        <div id="login-form">
+            <h3 class="text-center mb-4">Login</h3>
+            <form>
+                <div class="mb-3">
+                    <label for="login-email" class="form-label">Email address</label>
+                    <input type="email" class="form-control" id="login-email" placeholder="Enter email">
+                </div>
+                <div class="mb-3">
+                    <label for="login-password" class="form-label">Password</label>
+                    <input type="password" class="form-control" id="login-password" placeholder="Enter password">
+                </div>
+                <button type="submit" class="btn btn-dark w-100 mb-2">Login</button>
+            </form>
+            <p class="text-center mt-3">
+                Don’t have an account?
+                <a href="#" onclick="showSignup()">Sign Up</a>
+            </p>
+        </div>
+
+        <!-- SIGNUP FORM (Initially Hidden) -->
+        <div id="signup-form" style="display: none;">
+            <h3 class="text-center mb-4">Sign Up</h3>
+            <form>
+                <div class="mb-3">
+                    <label for="signup-name" class="form-label">Full Name</label>
+                    <input type="text" class="form-control" id="signup-name" placeholder="Enter your name">
+                </div>
+                <div class="mb-3">
+                    <label for="signup-email" class="form-label">Email</label>
+                    <input type="email" class="form-control" id="signup-email" placeholder="Enter email">
+                </div>
+                <div class="mb-3">
+                    <label for="signup-mobile" class="form-label">Mobile Number</label>
+                    <input type="tel" class="form-control" id="signup-mobile" placeholder="Enter mobile number">
+                </div>
+                <div class="mb-3">
+                    <label for="signup-password" class="form-label">Password</label>
+                    <input type="password" class="form-control" id="signup-password" placeholder="Enter password">
+                </div>
+                <button type="submit" class="btn btn-dark w-100 mb-2">Sign Up</button>
+            </form>
+            <p class="text-center mt-3">
+                Already have an account?
+                <a href="#" onclick="showLogin()">Login</a>
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+
+    const sidebar = document.getElementById("sidebar");
+    const toggleBtn = document.getElementById("sidebar-toggle");
+
+    toggleBtn.addEventListener("click", () => {
+        sidebar.classList.toggle("collapsed");
+    });
+
+
+    // ===== Open/Close Overlay =====
+    const overlay = document.getElementById("login-overlay");
+    const loginBtn = document.getElementById("login-btn");
+
+    loginBtn?.addEventListener("click", () => {
+        overlay.style.display = "flex";
+    });
+
+    overlay.addEventListener("click", (e) => {
+        if (e.target === overlay) {
+            overlay.style.display = "none"; // close when clicking outside the box
+        }
+    });
+
+    // ===== Toggle Between Forms =====
+    function showSignup() {
+        document.getElementById("login-form").style.display = "none";
+        document.getElementById("signup-form").style.display = "block";
+    }
+
+    function showLogin() {
+        document.getElementById("signup-form").style.display = "none";
+        document.getElementById("login-form").style.display = "block";
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const chatBox = document.getElementById('chat-box');
+        chatBox.scrollTop = chatBox.scrollHeight;
+    });
+
+    document.getElementById('user-input').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            document.getElementById('prompt-button').click();
+        }
+    });
+
+
+    document.getElementById('prompt-button').addEventListener('click', async function (e) {
+        e.preventDefault();
+        const input = document.getElementById('user-input');
+        const message = input.value.trim();
+        if (!message) return;
+
+        // Append user message
+        const chatBox = document.getElementById('chat-box');
+        const userDiv = document.createElement('div');
+        userDiv.className = 'chat-message user';
+        userDiv.textContent = message;
+        chatBox.appendChild(userDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+
+        // Placeholder for bot message
+        const botDiv = document.createElement('div');
+        botDiv.className = 'chat-message bot';
+        botDiv.textContent = 'Thinking...'; // Typing indicator
+        chatBox.appendChild(botDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+
+        input.value = '';
+
+        try {
+            const response = await fetch('/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ user_input: message }),
+            });
+
+            const data = await response.json();
+            botDiv.textContent = '';
+            typeHTML(botDiv, data.reply); // Typing animation
+        } catch (error) {
+            botDiv.textContent = 'Error getting response.';
+            console.error('Fetch error:', error);
+        }
+    });
+
+
+    function typeText(element, text, speed = 25) {
+        let i = 0;
+        const interval = setInterval(() => {
+            if (i < text.length) {
+                element.textContent += text.charAt(i++);
+            } else {
+                clearInterval(interval);
+            }
+        }, speed);
+    }
+
+    function typeHTML(element, html, speed = 25) {
+        const tempDiv = document.createElement("div");
+        tempDiv.innerHTML = html;
+        const nodes = Array.from(tempDiv.childNodes);
+
+        function typeNode(index) {
+            if (index >= nodes.length) return;
+
+            const node = nodes[index];
+
+            if (node.nodeType === Node.TEXT_NODE) {
+                let i = 0;
+                const span = document.createElement('span');
+                element.appendChild(span);
+
+                const interval = setInterval(() => {
+                    if (i < node.textContent.length) {
+                        span.textContent += node.textContent.charAt(i++);
+                    } else {
+                        clearInterval(interval);
+                        typeNode(index + 1);
+                    }
+                }, speed);
+            } else if (node.nodeType === Node.ELEMENT_NODE) {
+                const clone = node.cloneNode(false); // Clone the tag but not the content
+                element.appendChild(clone);
+
+                // Recursively type out child content
+                const innerNodes = Array.from(node.childNodes);
+                function typeChild(childIndex) {
+                    if (childIndex >= innerNodes.length) {
+                        typeNode(index + 1); // Move to next top-level node
+                        return;
+                    }
+
+                    const child = innerNodes[childIndex];
+
+                    if (child.nodeType === Node.TEXT_NODE) {
+                        let i = 0;
+                        const span = document.createElement('span');
+                        clone.appendChild(span);
+
+                        const interval = setInterval(() => {
+                            if (i < child.textContent.length) {
+                                span.textContent += child.textContent.charAt(i++);
+                            } else {
+                                clearInterval(interval);
+                                typeChild(childIndex + 1);
+                            }
+                        }, speed);
+                    } else {
+                        const childClone = child.cloneNode(false);
+                        clone.appendChild(childClone);
+                        const grandChildren = Array.from(child.childNodes);
+                        childClone.innerHTML = ''; // Clean up to fill manually
+                        innerNodes.splice(childIndex + 1, 0, ...grandChildren); // Insert grandchildren right after
+                        typeChild(childIndex + 1); // Continue
+                    }
+                }
+                typeChild(0);
+            }
+        }
+        typeNode(0);
+    }
+
+</script>
+{% endblock %}
+
+{% block style %}
+<style>
+    body {
+        display: flex;
+        margin: 0;
+        height: 100vh;
+    }
+
+    .sidebar {
+        width: 250px;
+        background-color: rgba(255, 255, 255, 0.7);
+        height: 100vh;
+        position: relative;
+        transition: width 0.3s ease;
+        overflow: hidden;
+    }
+
+    /* Collapsed sidebar */
+    .sidebar.collapsed {
+        width: 60px;
+    }
+
+    /* Hide text when collapsed */
+    .sidebar.collapsed h5,
+    .sidebar.collapsed span,
+    .sidebar.collapsed .custom-btn {
+        display: none;
+    }
+
+    /* Keep icons visible */
+    .sidebar .custom-btn i {
+        margin-right: 0;
+    }
+
+    .sidebar.collapsed .custom-btn i {
+        display: block;
+        text-align: center;
+        font-size: 18px;
+    }
+
+    /* Toggle button styling */
+    .toggle-btn {
+        position: absolute;
+        top: 6px;
+        right: 15px;
+        color: #000;
+        border: none;
+        border-radius: 10%;
+        padding: 4px 10px;
+        cursor: pointer;
+        z-index: 1000;
+    }
+
+    .content {
+        flex: 1;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding-top: 30px;
+        flex-direction: column;
+        background-color: rgba(245, 245, 245, 0.7);
+        position: relative;
+        height: 100vh;
+    }
+
+
+    .chat-box {
+        width: 100%;
+        height: 70vh;
+        overflow-y: auto;
+        padding: 20px;
+        padding-right: 150px;
+        padding-left: 150px;
+        display: flex;
+        flex-direction: column;
+        flex-grow: 1;
+        gap: 10px;
+    }
+
+    .chat-input {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding-top: 15px;
+        padding-bottom: 30px;
+        background: rgba(245, 245, 245, 0.7);
+        backdrop-filter: blur(12px);
+    }
+
+    .chat-input .input-group {
+        max-width: 800px;
+        width: 100%;
+    }
+
+    .form-control:focus {
+        box-shadow: none !important;
+        border-color: #ccc !important;
+    }
+
+    .chat-message {
+        padding: 10px 15px;
+        border-radius: 10px;
+        max-width: 80%;
+        word-wrap: break-word;
+    }
+
+    .chat-message.user {
+        background-color: #000000;
+        color: #fff;
+        max-width: 70%;
+        border-top-right-radius: 0px;
+        border-top-left-radius: 15px;
+        border-bottom-left-radius: 15px;
+        border-bottom-right-radius: 15px;
+        align-self: flex-end;
+    }
+
+    .chat-message.bot {
+        background-color: #f1f0f0;
+        align-self: flex-start;
+        white-space: pre-wrap;
+        line-height: 1.4;
+        padding: 10px;
+        border-top-right-radius: 15px;
+        border-top-left-radius: 0px;
+        border-bottom-left-radius: 15px;
+        border-bottom-right-radius: 15px;
+    }
+
+    .chat-message.bot ol,
+    .chat-message.bot ul {
+        margin: 0.5em;
+        padding-left: 1em;
+        list-style-position: inside;
+    }
+
+    .chat-message.bot li {
+        margin-bottom: 0.2em;
+        line-height: 1.2;
+    }
+
+    .chat-message.bot ol+p,
+    .chat-message.bot ul+p {
+        margin-top: 0.5em;
+    }
+
+    .custom-btn {
+        text-align: left;
+        background: none;
+        border: none;
+        color: #000;
+        padding: 5px 10px;
+        border-radius: 10px;
+    }
+
+    .custom-btn:hover {
+        background-color: #f1f0f0;
+        cursor: pointer;
+    }
+
+    /* ===== Overlay Login Modal ===== */
+    .overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.6);
+        backdrop-filter: blur(6px);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+    }
+
+    .overlay .card {
+        width: 380px;
+        border-radius: 12px;
+    }
+</style>
+{% endblock %}
