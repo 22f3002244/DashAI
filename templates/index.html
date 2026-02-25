@@ -398,18 +398,12 @@ a{color:var(--b)}
 ══════════════════════════════════════════════════════════ -->
 <header class="topbar">
   <div class="topbar-brand">
-    <div class="topbar-logo">TB</div>
+    <div class="topbar-logo">U</div>
     <div>
-      <div class="topbar-name">IoT Dashboard</div>
-      <div class="topbar-sub">AI-powered · 4-agent pipeline</div>
+      <div class="topbar-name">Dash AI</div>
     </div>
   </div>
   <div class="topbar-right">
-    {% if groq_configured %}
-    <div class="topbar-chip active">AI Ready</div>
-    {% else %}
-    <div class="topbar-chip">AI Offline</div>
-    {% endif %}
     <div id="user-pill" class="user-pill" style="display:none">
       <span class="uname" id="user-name-display"></span>
       <span class="logout-btn" onclick="logout()">Sign out</span>
@@ -436,15 +430,14 @@ a{color:var(--b)}
       <h2>Connect to ThingsBoard</h2>
       <p class="subtitle">ThingsBoard is the IoT platform your devices send data to. Choose your setup below and sign in to see your device data.</p>
 
-      <!-- Setup selector -->
-      <div class="setup-row" id="setup-row">
-        {% for p in tb_presets %}
-        <button class="setup-opt {% if loop.first %}active{% endif %}"
-                onclick="selectPreset('{{ p.key }}', '{{ p.url }}', this)">
-          <span class="so-name">{{ p.label }}</span>
-          <span class="so-url">{{ p.url or 'Enter your URL' }}</span>
-        </button>
-        {% endfor %}
+      <!-- Setup selector dropdown -->
+      <div class="field-group">
+        <label>ThingsBoard Server</label>
+        <select class="fi" id="preset-select" onchange="onPresetChange(this.value)" style="cursor:pointer">
+          {% for p in tb_presets %}
+          <option value="{{ p.key }}" {% if loop.first %}selected{% endif %}>{{ p.label }}</option>
+          {% endfor %}
+        </select>
       </div>
 
       <!-- Host URL (shows for self/pe) -->
@@ -492,13 +485,6 @@ a{color:var(--b)}
         Sign In &amp; Continue →
       </button>
 
-      <!-- Demo note (shows for demo preset) -->
-      <div class="demo-note" id="demo-note" style="display:none">
-        <strong>Demo Server Credentials</strong><br>
-        Email: <code>tenant@thingsboard.org</code><br>
-        Password: <code>tenant</code><br>
-        These are public read-only credentials. Your own data will not appear here.
-      </div>
     </div>
 
   </div>
@@ -522,9 +508,13 @@ a{color:var(--b)}
       <h2>Choose a Device</h2>
       <p class="subtitle">Select the device whose data you want to explore. Your available devices are listed below.</p>
 
-      <!-- Device list -->
-      <div id="device-list-wrap">
-        <div class="device-empty">Loading your devices…</div>
+      <!-- Device dropdown -->
+      <div class="field-group">
+        <label>Select Device</label>
+        <select class="fi" id="device-select" onchange="onDeviceSelectChange()" style="cursor:pointer">
+          <option value="">Loading your devices…</option>
+        </select>
+        <div class="field-hint" id="device-hint"></div>
       </div>
 
       <!-- Manual ID fallback -->
@@ -538,12 +528,11 @@ a{color:var(--b)}
       <!-- Time range -->
       <div class="field-group">
         <label>Time Period to Analyse</label>
-        <div class="time-select-row" id="time-row">
+        <select class="fi" id="time-select" onchange="onTimeSelectChange(this.value)" style="cursor:pointer">
           {% for k,v in time_ranges.items() %}
-          <button class="time-opt {% if k=='24h' %}active{% endif %}"
-                  onclick="selectTime('{{ k }}',this)">{{ v[0] }}</button>
+          <option value="{{ k }}" {% if k=='24h' %}selected{% endif %}>{{ v[0] }}</option>
           {% endfor %}
-        </div>
+        </select>
       </div>
 
       <div class="error-inline" id="device-error" style="display:none">
@@ -661,16 +650,14 @@ function showScreen(id) {
 
 /* ─── Preset selection ───────────────────────────────────── */
 let currentPreset = 'cloud';
-function selectPreset(key, url, btn) {
+function onPresetChange(key) {
   currentPreset = key;
-  document.querySelectorAll('.setup-opt').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-
   const hostField = document.getElementById('host-field');
   const demoNote  = document.getElementById('demo-note');
+  const presetUrl = PRESET_URLS[key];
 
-  if (url) {
-    S.host = url;
+  if (presetUrl) {
+    S.host = presetUrl;
     hostField.style.display = 'none';
   } else {
     S.host = '';
@@ -733,50 +720,60 @@ async function doLogin() {
 /* ─── Load device picker screen ─────────────────────────── */
 async function loadDeviceScreen() {
   showScreen('device');
-  document.getElementById('device-list-wrap').innerHTML =
-    '<div class="device-empty">Loading your devices…</div>';
+  const select = document.getElementById('device-select');
+  select.innerHTML = '<option value="">Loading your devices…</option>';
 
   try {
     const res  = await post('/api/devices', {tb_host:S.host, token:S.token});
     const data = await res.json();
     renderDeviceList(data.devices || []);
     if (data.warning) {
-      document.getElementById('device-list-wrap').innerHTML +=
-        `<div style="font-size:11px;color:var(--g5);padding:6px 14px">${esc(data.warning)}</div>`;
+      document.getElementById('device-hint').textContent += ' — ' + data.warning;
     }
   } catch(e) {
-    document.getElementById('device-list-wrap').innerHTML =
-      '<div class="device-empty">Could not load devices. Enter Device ID manually below.</div>';
+    select.innerHTML = '<option value="">Could not load devices</option>';
+    document.getElementById('device-hint').textContent = 'Enter Device ID manually below.';
   }
 }
 
 function renderDeviceList(devices) {
+  const select = document.getElementById('device-select');
+  const hint = document.getElementById('device-hint');
+  
   if (!devices.length) {
-    document.getElementById('device-list-wrap').innerHTML =
-      '<div class="device-empty">No devices found. Enter a Device ID manually below.</div>';
+    select.innerHTML = '<option value="">No devices found</option>';
+    hint.textContent = 'Enter a Device ID manually below or reload the devices.';
     return;
   }
-  let html = '<div class="device-list">';
+  
+  select.innerHTML = '<option value="">-- Choose a device --</option>';
   devices.forEach(d => {
-    html += `
-      <div class="device-item" onclick="selectDevice('${esc(d.id)}','${esc(d.name)}')" id="di-${d.id}">
-        <div class="di-info">
-          <div class="di-name">${esc(d.name)}</div>
-          <div class="di-type">${esc(d.type || 'Device')}</div>
-        </div>
-        <div class="di-arrow">›</div>
-      </div>`;
+    const option = document.createElement('option');
+    option.value = d.id;
+    option.textContent = `${d.name} (${d.type || 'Device'})`;
+    option.dataset.name = d.name;
+    select.appendChild(option);
   });
-  html += '</div>';
-  document.getElementById('device-list-wrap').innerHTML = html;
+  hint.textContent = `${devices.length} device${devices.length !== 1 ? 's' : ''} available`;
+}
+
+function onDeviceSelectChange() {
+  const select = document.getElementById('device-select');
+  if (!select.value) {
+    S.deviceId = '';
+    S.deviceName = '';
+    return;
+  }
+  const option = select.options[select.selectedIndex];
+  S.deviceId = option.value;
+  S.deviceName = option.dataset.name || option.textContent;
 }
 
 function selectDevice(id, name) {
   S.deviceId   = id;
   S.deviceName = name;
-  document.querySelectorAll('.device-item').forEach(el => el.classList.remove('selected'));
-  const el = document.getElementById(`di-${id}`);
-  if (el) el.classList.add('selected');
+  const select = document.getElementById('device-select');
+  select.value = id;
 }
 
 function useManualId() {
@@ -789,10 +786,8 @@ function useManualId() {
   document.getElementById('manual_device_id').style.borderColor = 'var(--b)';
 }
 
-function selectTime(key, btn) {
+function onTimeSelectChange(key) {
   S.timeRange = key;
-  document.querySelectorAll('.time-opt').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
 }
 
 function goBack() { showScreen('connect'); }
