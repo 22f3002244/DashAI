@@ -1,0 +1,12 @@
+# ThingsBoard AI Dashboard — Requirements
+# pip install -r requirements.txt
+
+flask>=3.0.0
+requests>=2.31.0
+
+# Optional: ThingsBoard Python REST client (for advanced use)
+# tb-rest-client>=3.5.0
+
+# Optional extras
+# python-dotenv>=1.0.0   # .env is loaded manually, but dotenv works too
+# gunicorn>=21.0.0       # for production deployment

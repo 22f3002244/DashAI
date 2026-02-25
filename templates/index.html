@@ -1,0 +1,1142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>IoT Dashboard — AI Powered</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+/* ══════════════════════════════════════════════════════════════
+   RESET & ROOT
+══════════════════════════════════════════════════════════════ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --b:#000;--w:#fff;
+  --g1:#f8f8f8;--g2:#f0f0f0;--g3:#e0e0e0;--g4:#c0c0c0;--g5:#999;--g6:#555;--g7:#333;
+  --border:1px solid #000;--border-soft:1px solid #e0e0e0;
+  --font:'IBM Plex Sans',sans-serif;--mono:'IBM Plex Mono',monospace;
+  --radius:0px;
+}
+html{font-size:14px;-webkit-font-smoothing:antialiased}
+body{font-family:var(--font);background:var(--w);color:var(--b);line-height:1.6;min-height:100vh}
+a{color:var(--b)}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-thumb{background:var(--g3)}
+
+/* ══════════════════════════════════════════════════════════════
+   TOPBAR
+══════════════════════════════════════════════════════════════ */
+.topbar{
+  position:sticky;top:0;z-index:300;
+  height:52px;border-bottom:var(--border);background:var(--w);
+  display:flex;align-items:center;justify-content:space-between;padding:0 2rem;
+}
+.topbar-brand{
+  display:flex;align-items:center;gap:12px;
+}
+.topbar-logo{
+  width:28px;height:28px;border:var(--border);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:10px;font-weight:500;
+}
+.topbar-name{font-weight:600;font-size:15px;letter-spacing:-.3px}
+.topbar-sub{font-family:var(--mono);font-size:10px;color:var(--g5);letter-spacing:.05em}
+.topbar-right{display:flex;align-items:center;gap:8px}
+.topbar-chip{
+  font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;
+  padding:3px 9px;border:1px solid var(--g3);color:var(--g5);
+}
+.topbar-chip.active{border-color:var(--b);background:var(--b);color:var(--w)}
+.user-pill{
+  display:flex;align-items:center;gap:7px;
+  border:var(--border-soft);padding:4px 10px;font-size:12px;
+  cursor:pointer;
+}
+.user-pill:hover{border-color:var(--b)}
+.user-pill .uname{font-weight:500}
+.user-pill .logout-btn{font-family:var(--mono);font-size:9px;color:var(--g5);margin-left:4px;padding-left:7px;border-left:1px solid var(--g3)}
+
+/* ══════════════════════════════════════════════════════════════
+   SCREEN SYSTEM (wizard steps)
+══════════════════════════════════════════════════════════════ */
+.screen{display:none}
+.screen.active{display:flex}
+
+/* ══════════════════════════════════════════════════════════════
+   SCREEN 1 — CONNECT  (centered card)
+══════════════════════════════════════════════════════════════ */
+#screen-connect{
+  min-height:calc(100vh - 52px);
+  align-items:center;justify-content:center;
+  padding:2rem;
+}
+.connect-wrap{width:100%;max-width:520px}
+
+.step-indicator{
+  display:flex;align-items:center;gap:0;margin-bottom:2rem;
+}
+.step-dot{
+  display:flex;align-items:center;gap:8px;
+  font-family:var(--mono);font-size:10px;letter-spacing:.05em;color:var(--g4);
+}
+.step-dot.active{color:var(--b)}
+.step-dot .sdot{
+  width:24px;height:24px;border:1px solid var(--g3);
+  display:flex;align-items:center;justify-content:center;
+  font-size:10px;font-weight:500;flex-shrink:0;
+}
+.step-dot.active .sdot{border-color:var(--b);background:var(--b);color:var(--w)}
+.step-dot.done .sdot{border-color:var(--b);background:var(--w);color:var(--b)}
+.step-line{flex:1;height:1px;background:var(--g3);margin:0 8px}
+.step-line.done{background:var(--b)}
+
+.connect-card{border:var(--border);padding:2rem}
+.connect-card h2{font-size:18px;font-weight:600;letter-spacing:-.4px;margin-bottom:.35rem}
+.connect-card .subtitle{font-size:13px;color:var(--g6);margin-bottom:1.75rem;line-height:1.6}
+
+/* Setup buttons */
+.setup-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:1.25rem}
+.setup-opt{
+  border:var(--border-soft);padding:12px 10px;cursor:pointer;background:var(--w);
+  text-align:left;
+}
+.setup-opt:hover{border-color:var(--b)}
+.setup-opt.active{border-color:var(--b);background:var(--b);color:var(--w)}
+.setup-opt .so-name{font-weight:500;font-size:13px;display:block;margin-bottom:2px}
+.setup-opt .so-url{font-family:var(--mono);font-size:10px;opacity:.6;display:block}
+.setup-opt.active .so-url{opacity:.7}
+
+.field-group{margin-bottom:1rem}
+.field-group label{display:block;font-size:12px;font-weight:500;color:var(--g6);margin-bottom:.35rem}
+.field-group .field-hint{font-size:11px;color:var(--g5);margin-top:.3rem}
+.fi{
+  width:100%;border:var(--border-soft);padding:9px 12px;font-size:13px;
+  font-family:inherit;outline:none;background:var(--w);color:var(--b);
+}
+.fi:focus{border-color:var(--b);background:var(--g1)}
+.fi::placeholder{color:var(--g4)}
+
+/* Tabs inside connect card */
+.auth-tabs{display:flex;gap:0;margin-bottom:1.25rem;border-bottom:var(--border-soft)}
+.auth-tab{
+  padding:8px 16px;font-size:13px;cursor:pointer;
+  border-bottom:2px solid transparent;margin-bottom:-1px;color:var(--g5);
+}
+.auth-tab.active{border-bottom-color:var(--b);color:var(--b);font-weight:500}
+
+.divider-or{
+  display:flex;align-items:center;gap:10px;margin:1rem 0;
+  font-family:var(--mono);font-size:10px;color:var(--g4);
+}
+.divider-or::before,.divider-or::after{content:'';flex:1;height:1px;background:var(--g3)}
+
+.btn-full{
+  width:100%;padding:12px;font-size:13px;font-weight:500;
+  border:none;cursor:pointer;font-family:inherit;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+}
+.btn-full.primary{background:var(--b);color:var(--w)}
+.btn-full.primary:hover{background:var(--g7)}
+.btn-full.primary:disabled{background:var(--g4);cursor:not-allowed}
+.btn-full.secondary{background:var(--w);color:var(--b);border:var(--border-soft)}
+.btn-full.secondary:hover{border-color:var(--b)}
+
+.error-inline{
+  border:1px solid var(--b);padding:10px 14px;margin-bottom:1rem;
+  font-size:12px;display:flex;gap:10px;align-items:flex-start;
+}
+.error-inline .ei-icon{font-size:16px;flex-shrink:0}
+
+.demo-note{
+  margin-top:1rem;padding:10px 14px;background:var(--g1);
+  font-size:12px;line-height:1.7;color:var(--g6);border:var(--border-soft);
+}
+.demo-note strong{color:var(--b)}
+
+/* ══════════════════════════════════════════════════════════════
+   SCREEN 2 — PICK DEVICE
+══════════════════════════════════════════════════════════════ */
+#screen-device{
+  min-height:calc(100vh - 52px);
+  align-items:center;justify-content:center;padding:2rem;
+}
+.device-wrap{width:100%;max-width:520px}
+
+.device-list{border:var(--border-soft);max-height:340px;overflow-y:auto;margin-bottom:1rem}
+.device-item{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 14px;border-bottom:var(--border-soft);cursor:pointer;
+}
+.device-item:last-child{border-bottom:none}
+.device-item:hover{background:var(--g1)}
+.device-item.selected{background:var(--b);color:var(--w)}
+.di-info .di-name{font-weight:500;font-size:13px}
+.di-info .di-type{font-family:var(--mono);font-size:10px;color:var(--g5);margin-top:1px}
+.device-item.selected .di-type{color:var(--g4)}
+.di-arrow{font-size:16px;color:var(--g4)}
+.device-item.selected .di-arrow{color:var(--w)}
+
+.device-empty{padding:2rem;text-align:center;color:var(--g5);font-size:13px}
+
+.manual-id{display:flex;gap:6px;margin-bottom:1rem}
+.manual-id input{flex:1}
+
+.time-select-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1.25rem}
+.time-opt{
+  border:var(--border-soft);padding:7px 12px;cursor:pointer;
+  font-family:var(--mono);font-size:11px;background:var(--w);
+}
+.time-opt:hover{border-color:var(--b)}
+.time-opt.active{border-color:var(--b);background:var(--b);color:var(--w)}
+
+/* ══════════════════════════════════════════════════════════════
+   SCREEN 3 — DASHBOARD
+══════════════════════════════════════════════════════════════ */
+#screen-dashboard{
+  flex-direction:column;min-height:calc(100vh - 52px);
+}
+.dash-layout{display:grid;grid-template-columns:260px 1fr;flex:1}
+
+/* Sidebar */
+.dash-sidebar{
+  border-right:var(--border);padding:1.25rem;
+  display:flex;flex-direction:column;gap:1.25rem;
+  position:sticky;top:52px;height:calc(100vh - 52px);overflow-y:auto;
+}
+.ds-label{
+  font-family:var(--mono);font-size:9px;letter-spacing:.15em;text-transform:uppercase;
+  color:var(--g5);margin-bottom:.6rem;display:flex;align-items:center;gap:6px;
+}
+.ds-label::after{content:'';flex:1;height:1px;background:var(--g2)}
+
+/* Device info card in sidebar */
+.device-info-card{border:var(--border-soft);padding:12px}
+.dic-name{font-size:14px;font-weight:600;letter-spacing:-.2px;margin-bottom:2px}
+.dic-type{font-family:var(--mono);font-size:10px;color:var(--g5)}
+.dic-meta{font-family:var(--mono);font-size:10px;color:var(--g5);margin-top:8px;line-height:1.9}
+
+/* Agent steps */
+.pipeline-steps{display:flex;flex-direction:column;gap:5px}
+.p-step{display:flex;align-items:center;gap:9px;padding:8px 10px;border:1px solid var(--g2)}
+.p-dot{width:8px;height:8px;border-radius:50%;background:var(--g3);flex-shrink:0}
+.p-step.running .p-dot{background:var(--b);animation:blink 1s ease-in-out infinite}
+.p-step.done .p-dot{background:var(--b)}
+.p-step.error .p-dot{background:var(--g5)}
+.p-step.skipped .p-dot{background:var(--g3);opacity:.4}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+.p-name{font-family:var(--mono);font-size:10px;flex:1;line-height:1.3}
+.p-status{font-family:var(--mono);font-size:9px;text-transform:uppercase;color:var(--g4)}
+.p-step.done .p-status{color:var(--b)}
+.p-step.running .p-status{color:var(--b)}
+.p-step.error .p-status{color:var(--g5)}
+
+/* Agent log */
+.agent-log{
+  border:1px solid var(--g2);padding:8px 10px;
+  font-family:var(--mono);font-size:9px;line-height:2;
+  color:var(--g6);max-height:160px;overflow-y:auto;
+}
+.log-entry .le-agent{color:var(--b);font-weight:500}
+.log-entry .le-time{color:var(--g4)}
+
+.sidebar-actions{display:flex;flex-direction:column;gap:6px}
+.sb-btn{
+  border:var(--border-soft);background:var(--w);padding:9px 12px;
+  font-size:12px;cursor:pointer;font-family:inherit;text-align:left;width:100%;
+}
+.sb-btn:hover{border-color:var(--b)}
+.sb-btn.primary-sb{background:var(--b);color:var(--w);border-color:var(--b)}
+.sb-btn.primary-sb:hover{background:var(--g7)}
+
+/* Main dashboard area */
+.dash-main{padding:1.75rem 2rem;overflow-y:auto}
+
+/* Running state */
+.running-state{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:400px;text-align:center;gap:1rem;
+}
+.running-glyph{font-family:var(--mono);font-size:48px;color:var(--g3);line-height:1}
+.running-state p{font-size:13px;color:var(--g6)}
+.running-state .flow{font-family:var(--mono);font-size:10px;color:var(--g4)}
+
+/* Dashboard header */
+.dash-hdr{
+  display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;
+  border-bottom:var(--border);padding-bottom:1.25rem;margin-bottom:1.75rem;
+}
+.dh-title{font-size:22px;font-weight:600;letter-spacing:-.5px}
+.dh-meta{font-family:var(--mono);font-size:10px;color:var(--g5);margin-top:4px;line-height:1.9}
+.dh-badges{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;align-items:flex-start}
+.badge{font-family:var(--mono);font-size:9px;padding:3px 9px;border:var(--border-soft);color:var(--g6)}
+.badge.fill{background:var(--b);color:var(--w);border-color:var(--b)}
+
+/* Summary strip */
+.summary-strip{
+  display:grid;grid-template-columns:repeat(4,1fr);
+  border:var(--border);background:var(--b);gap:1px;margin-bottom:1.75rem;
+}
+.sum-cell{background:var(--w);padding:14px 16px}
+.sum-num{font-family:var(--mono);font-size:24px;font-weight:400;letter-spacing:-1px;line-height:1;margin-bottom:3px}
+.sum-lbl{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--g5)}
+
+/* Section heading */
+.sec-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem}
+.sec-title{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--g5)}
+.sec-count{font-family:var(--mono);font-size:9px;color:var(--g4)}
+.sec-sep{width:100%;height:1px;background:var(--g2);margin-bottom:1rem}
+
+/* KPI grid */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:1px;background:var(--b);border:var(--border);margin-bottom:1.75rem}
+.kpi-card{background:var(--w);padding:.9rem}
+.kc-label{font-family:var(--mono);font-size:9px;color:var(--g5);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kc-val{font-family:var(--mono);font-size:26px;font-weight:300;letter-spacing:-1.5px;line-height:1;margin-bottom:3px}
+.kc-unit{font-size:12px;color:var(--g5);font-weight:400;letter-spacing:0}
+.kc-range{display:flex;justify-content:space-between;font-family:var(--mono);font-size:9px;color:var(--g4);margin-bottom:6px}
+.kc-footer{display:flex;gap:4px;flex-wrap:wrap}
+.tag{font-family:var(--mono);font-size:8px;text-transform:uppercase;letter-spacing:.06em;padding:2px 5px;border:1px solid var(--g3);color:var(--g5)}
+.tag.rising{border-color:var(--b);color:var(--b)}
+.tag.falling{border-color:var(--g5)}
+.tag.warn{border-color:#888;color:#888}
+
+/* Boolean strip */
+.bool-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1px;background:var(--b);border:var(--border);margin-bottom:1.75rem}
+.bool-card{background:var(--w);padding:.9rem}
+.bc-label{font-family:var(--mono);font-size:9px;color:var(--g5);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
+.bc-status{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.bc-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.bc-dot.on{background:var(--b)}.bc-dot.off{background:var(--g3)}
+.bc-state{font-size:14px;font-weight:600}
+.bc-bar{height:4px;background:var(--g2);margin-bottom:5px}
+.bc-fill{height:4px;background:var(--b)}
+.bc-pcts{display:flex;justify-content:space-between;font-family:var(--mono);font-size:9px;color:var(--g5)}
+
+/* String cards */
+.str-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1px;background:var(--b);border:var(--border);margin-bottom:1.75rem}
+.str-card{background:var(--w);padding:.9rem}
+.sc-label{font-family:var(--mono);font-size:9px;color:var(--g5);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+.sc-latest{font-family:var(--mono);font-size:12px;margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sc-bar-row{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.sc-val{font-family:var(--mono);font-size:10px;color:var(--g6);width:75px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0}
+.sc-bar-bg{flex:1;height:3px;background:var(--g2)}
+.sc-bar-fill{height:3px;background:var(--b)}
+.sc-cnt{font-family:var(--mono);font-size:9px;color:var(--g4);width:28px;text-align:right;flex-shrink:0}
+
+/* Chart grid */
+.chart-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:1px;background:var(--b);border:var(--border);margin-bottom:1.75rem}
+.chart-cell{background:var(--w);padding:1.1rem}
+.cc-hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.9rem}
+.cc-title{font-size:13px;font-weight:600;letter-spacing:-.1px}
+.cc-desc{font-size:11px;color:var(--g5);margin-top:2px;line-height:1.4}
+.cc-type{font-family:var(--mono);font-size:8px;text-transform:uppercase;letter-spacing:.1em;color:var(--g5);border:1px solid var(--g3);padding:2px 6px;white-space:nowrap;flex-shrink:0;margin-left:8px}
+.chart-wrap{height:200px}
+
+/* Highlight blocks (kpi_single + boolean_status from AI) */
+.highlight-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1px;background:var(--b);border:var(--border);margin-bottom:1.75rem}
+.hl-kpi{background:var(--w);padding:1.1rem}
+.hl-kpi .hk-label{font-family:var(--mono);font-size:9px;color:var(--g5);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px}
+.hl-kpi .hk-val{font-family:var(--mono);font-size:38px;font-weight:300;letter-spacing:-2px;line-height:1;margin-bottom:4px}
+.hl-kpi .hk-unit{font-size:15px;color:var(--g5);font-weight:300}
+.hl-kpi .hk-desc{font-size:11px;color:var(--g5);margin-top:8px}
+.hl-bool{background:var(--w);padding:1.1rem}
+.hl-bool .hb-label{font-family:var(--mono);font-size:9px;color:var(--g5);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px}
+.hl-bool .hb-state{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.hl-bool .hb-dot{width:14px;height:14px;border-radius:50%}
+.hl-bool .hb-dot.on{background:var(--b)}.hl-bool .hb-dot.off{background:var(--g3)}
+.hl-bool .hb-text{font-size:20px;font-weight:600}
+.hl-bool .hb-bar{height:5px;background:var(--g2);margin-bottom:5px}
+.hl-bool .hb-fill{height:5px;background:var(--b)}
+.hl-bool .hb-pcts{display:flex;justify-content:space-between;font-family:var(--mono);font-size:9px;color:var(--g5)}
+.hl-bool .hb-desc{font-size:11px;color:var(--g5);margin-top:8px}
+
+/* Patterns panel */
+.patterns-box{border:var(--border);margin-bottom:1.75rem}
+.pb-hdr{border-bottom:var(--border);padding:9px 1rem;display:flex;justify-content:space-between;align-items:center}
+.pb-title{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--g5)}
+.pb-body{padding:.5rem .75rem}
+.pat-row{display:flex;align-items:flex-start;gap:9px;padding:7px 0;border-bottom:1px solid var(--g1)}
+.pat-row:last-child{border-bottom:none}
+.pat-badge{font-family:var(--mono);font-size:8px;text-transform:uppercase;padding:2px 6px;border:var(--border);white-space:nowrap;margin-top:2px;flex-shrink:0}
+.pat-badge.warning{border-color:var(--g5);color:var(--g5)}
+.pat-text{font-size:12px;line-height:1.5}
+
+/* Attributes */
+.attr-box{border:var(--border);margin-bottom:1.75rem}
+.ab-hdr{border-bottom:var(--border);padding:9px 1rem;display:flex;justify-content:space-between}
+.ab-title{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--g5)}
+.attr-table{width:100%;border-collapse:collapse}
+.attr-table th{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--g5);padding:8px 14px;border-bottom:1px solid var(--g2);text-align:left;background:var(--g1)}
+.attr-table td{font-family:var(--mono);font-size:11px;padding:8px 14px;border-bottom:1px solid var(--g1);vertical-align:top}
+.attr-table tr:last-child td{border-bottom:none}
+.scope-tag{font-size:8px;padding:1px 5px;border:1px solid var(--g3);color:var(--g5);text-transform:uppercase}
+
+/* Notice boxes */
+.notice{border:var(--border-soft);padding:.85rem 1rem;margin-bottom:1rem;font-size:12px;display:flex;gap:10px}
+.notice strong{display:block;font-size:10px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px}
+.notice.error{border-color:var(--b);background:var(--g1)}
+.notice .n-icon{font-size:16px;flex-shrink:0}
+
+/* ══════════════════════════════════════════════════════════════
+   RESPONSIVE
+══════════════════════════════════════════════════════════════ */
+@media(max-width:860px){
+  .dash-layout{grid-template-columns:1fr}
+  .dash-sidebar{position:static;height:auto;border-right:none;border-bottom:var(--border)}
+  .summary-strip{grid-template-columns:1fr 1fr}
+  .chart-grid{grid-template-columns:1fr}
+  .kpi-grid{grid-template-columns:repeat(2,1fr)}
+  .topbar-sub{display:none}
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════
+     TOPBAR
+══════════════════════════════════════════════════════════ -->
+<header class="topbar">
+  <div class="topbar-brand">
+    <div class="topbar-logo">TB</div>
+    <div>
+      <div class="topbar-name">IoT Dashboard</div>
+      <div class="topbar-sub">AI-powered · 4-agent pipeline</div>
+    </div>
+  </div>
+  <div class="topbar-right">
+    {% if groq_configured %}
+    <div class="topbar-chip active">AI Ready</div>
+    {% else %}
+    <div class="topbar-chip">AI Offline</div>
+    {% endif %}
+    <div id="user-pill" class="user-pill" style="display:none">
+      <span class="uname" id="user-name-display"></span>
+      <span class="logout-btn" onclick="logout()">Sign out</span>
+    </div>
+  </div>
+</header>
+
+<!-- ══════════════════════════════════════════════════════════
+     SCREEN 1 — CONNECT
+══════════════════════════════════════════════════════════════ -->
+<div id="screen-connect" class="screen active">
+  <div class="connect-wrap">
+
+    <!-- Step indicator -->
+    <div class="step-indicator">
+      <div class="step-dot active" id="sdot-1"><div class="sdot">1</div>&nbsp;Connect</div>
+      <div class="step-line" id="sline-1"></div>
+      <div class="step-dot" id="sdot-2"><div class="sdot">2</div>&nbsp;Select Device</div>
+      <div class="step-line" id="sline-2"></div>
+      <div class="step-dot" id="sdot-3"><div class="sdot">3</div>&nbsp;Dashboard</div>
+    </div>
+
+    <div class="connect-card">
+      <h2>Connect to ThingsBoard</h2>
+      <p class="subtitle">ThingsBoard is the IoT platform your devices send data to. Choose your setup below and sign in to see your device data.</p>
+
+      <!-- Setup selector -->
+      <div class="setup-row" id="setup-row">
+        {% for p in tb_presets %}
+        <button class="setup-opt {% if loop.first %}active{% endif %}"
+                onclick="selectPreset('{{ p.key }}', '{{ p.url }}', this)">
+          <span class="so-name">{{ p.label }}</span>
+          <span class="so-url">{{ p.url or 'Enter your URL' }}</span>
+        </button>
+        {% endfor %}
+      </div>
+
+      <!-- Host URL (shows for self/pe) -->
+      <div class="field-group" id="host-field" style="display:none">
+        <label>Server Address</label>
+        <input class="fi" id="tb_host_custom" type="url" placeholder="https://your-thingsboard-server.com">
+        <div class="field-hint">The web address of your ThingsBoard installation</div>
+      </div>
+
+      <!-- Auth tabs -->
+      <div class="auth-tabs">
+        <div class="auth-tab active" onclick="switchTab('pass',this)">Sign in with Email</div>
+        <div class="auth-tab" onclick="switchTab('token',this)">Paste Access Token</div>
+      </div>
+
+      <!-- Email / Password tab -->
+      <div id="tab-pass">
+        <div class="field-group">
+          <label>Email Address</label>
+          <input class="fi" id="tb_email" type="email" placeholder="your@email.com" autocomplete="email">
+        </div>
+        <div class="field-group">
+          <label>Password</label>
+          <input class="fi" id="tb_password" type="password" placeholder="Your password"
+                 autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+        </div>
+      </div>
+
+      <!-- Token tab -->
+      <div id="tab-token" style="display:none">
+        <div class="field-group">
+          <label>Access Token (JWT)</label>
+          <input class="fi" id="tb_token_paste" type="password" placeholder="Paste your Bearer token here…">
+          <div class="field-hint">Get this from ThingsBoard → Profile → Security, or via the login API</div>
+        </div>
+      </div>
+
+      <!-- Error -->
+      <div class="error-inline" id="login-error" style="display:none">
+        <span class="ei-icon">⚠</span>
+        <span id="login-error-msg"></span>
+      </div>
+
+      <button class="btn-full primary" id="login-btn" onclick="doLogin()">
+        Sign In &amp; Continue →
+      </button>
+
+      <!-- Demo note (shows for demo preset) -->
+      <div class="demo-note" id="demo-note" style="display:none">
+        <strong>Demo Server Credentials</strong><br>
+        Email: <code>tenant@thingsboard.org</code><br>
+        Password: <code>tenant</code><br>
+        These are public read-only credentials. Your own data will not appear here.
+      </div>
+    </div>
+
+  </div>
+</div><!-- /#screen-connect -->
+
+<!-- ══════════════════════════════════════════════════════════
+     SCREEN 2 — PICK DEVICE
+══════════════════════════════════════════════════════════════ -->
+<div id="screen-device" class="screen">
+  <div class="device-wrap">
+
+    <div class="step-indicator">
+      <div class="step-dot done" id="sdot-1b"><div class="sdot">✓</div>&nbsp;Connected</div>
+      <div class="step-line done"></div>
+      <div class="step-dot active"><div class="sdot">2</div>&nbsp;Select Device</div>
+      <div class="step-line" id="sline-2b"></div>
+      <div class="step-dot" id="sdot-3b"><div class="sdot">3</div>&nbsp;Dashboard</div>
+    </div>
+
+    <div class="connect-card">
+      <h2>Choose a Device</h2>
+      <p class="subtitle">Select the device whose data you want to explore. Your available devices are listed below.</p>
+
+      <!-- Device list -->
+      <div id="device-list-wrap">
+        <div class="device-empty">Loading your devices…</div>
+      </div>
+
+      <!-- Manual ID fallback -->
+      <div class="divider-or">or enter Device ID manually</div>
+      <div class="manual-id">
+        <input class="fi" id="manual_device_id" type="text" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+        <button class="btn-full secondary" style="width:auto;padding:9px 14px;white-space:nowrap"
+                onclick="useManualId()">Use this ID</button>
+      </div>
+
+      <!-- Time range -->
+      <div class="field-group">
+        <label>Time Period to Analyse</label>
+        <div class="time-select-row" id="time-row">
+          {% for k,v in time_ranges.items() %}
+          <button class="time-opt {% if k=='24h' %}active{% endif %}"
+                  onclick="selectTime('{{ k }}',this)">{{ v[0] }}</button>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="error-inline" id="device-error" style="display:none">
+        <span class="ei-icon">⚠</span>
+        <span id="device-error-msg"></span>
+      </div>
+
+      <div style="display:flex;gap:8px">
+        <button class="btn-full secondary" style="max-width:120px" onclick="goBack()">← Back</button>
+        <button class="btn-full primary" id="generate-btn" onclick="generateDashboard()">
+          Generate Dashboard →
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div><!-- /#screen-device -->
+
+<!-- ══════════════════════════════════════════════════════════
+     SCREEN 3 — DASHBOARD
+══════════════════════════════════════════════════════════════ -->
+<div id="screen-dashboard" class="screen">
+  <div class="dash-layout">
+
+    <!-- Sidebar -->
+    <aside class="dash-sidebar">
+
+      <div>
+        <div class="ds-label">Device</div>
+        <div class="device-info-card">
+          <div class="dic-name" id="sid-name">—</div>
+          <div class="dic-type" id="sid-type"></div>
+          <div class="dic-meta" id="sid-meta"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="ds-label">AI Pipeline</div>
+        <div class="pipeline-steps">
+          <div class="p-step" id="ps-DataFetcher">
+            <div class="p-dot"></div>
+            <div class="p-name">01 · Data Fetcher<br><span style="color:var(--g5);font-weight:300">Retrieves sensor data</span></div>
+            <span class="p-status">idle</span>
+          </div>
+          <div class="p-step" id="ps-DataCleaner">
+            <div class="p-dot"></div>
+            <div class="p-name">02 · Data Analyser<br><span style="color:var(--g5);font-weight:300">Finds patterns</span></div>
+            <span class="p-status">idle</span>
+          </div>
+          <div class="p-step" id="ps-VizRecommender">
+            <div class="p-dot"></div>
+            <div class="p-name">03 · AI Chart Picker<br><span style="color:var(--g5);font-weight:300">Selects best visuals</span></div>
+            <span class="p-status">idle</span>
+          </div>
+          <div class="p-step" id="ps-DashboardBuilder">
+            <div class="p-dot"></div>
+            <div class="p-name">04 · Dashboard Builder<br><span style="color:var(--g5);font-weight:300">Assembles view</span></div>
+            <span class="p-status">idle</span>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="ds-label">Activity Log</div>
+        <div class="agent-log" id="agent-log">
+          <span style="color:var(--g4)">Waiting to start…</span>
+        </div>
+      </div>
+
+      <div class="sidebar-actions">
+        <button class="sb-btn primary-sb" onclick="rerunDashboard()">↺ Refresh Data</button>
+        <button class="sb-btn" onclick="changeDevice()">⇄ Change Device</button>
+        <button class="sb-btn" onclick="logout()">→ Sign Out</button>
+      </div>
+
+    </aside>
+
+    <!-- Main content -->
+    <main class="dash-main" id="dash-main">
+      <div class="running-state">
+        <div class="running-glyph">◌</div>
+        <p>Your dashboard is being prepared…</p>
+        <p class="flow">Data Fetcher → Analyser → AI Chart Picker → Builder</p>
+      </div>
+    </main>
+
+  </div>
+</div><!-- /#screen-dashboard -->
+
+<!-- ══════════════════════════════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════════════════════════════ -->
+<script>
+/* ─── App State ──────────────────────────────────────────── */
+const S = {
+  host:      '',
+  token:     '',
+  userName:  '',
+  deviceId:  '',
+  deviceName:'',
+  timeRange: '24h',
+};
+
+const PRESET_URLS = {
+  {% for p in tb_presets %}'{{ p.key }}':'{{ p.url }}',{% endfor %}
+};
+
+let activeCharts = [];
+
+/* ─── Screen navigation ──────────────────────────────────── */
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+}
+
+/* ─── Preset selection ───────────────────────────────────── */
+let currentPreset = 'cloud';
+function selectPreset(key, url, btn) {
+  currentPreset = key;
+  document.querySelectorAll('.setup-opt').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  const hostField = document.getElementById('host-field');
+  const demoNote  = document.getElementById('demo-note');
+
+  if (url) {
+    S.host = url;
+    hostField.style.display = 'none';
+  } else {
+    S.host = '';
+    hostField.style.display = '';
+    document.getElementById('tb_host_custom').focus();
+  }
+
+  demoNote.style.display = key === 'demo' ? '' : 'none';
+}
+
+/* ─── Auth tab switch ────────────────────────────────────── */
+let authMode = 'pass';
+function switchTab(mode, el) {
+  authMode = mode;
+  document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-pass').style.display  = mode==='pass'  ? '' : 'none';
+  document.getElementById('tab-token').style.display = mode==='token' ? '' : 'none';
+}
+
+/* ─── Login ──────────────────────────────────────────────── */
+async function doLogin() {
+  hideError('login-error');
+  const btn = document.getElementById('login-btn');
+  btn.disabled = true; btn.textContent = 'Signing in…';
+
+  const host = (currentPreset==='self'||currentPreset==='pe')
+    ? document.getElementById('tb_host_custom').value.trim()
+    : PRESET_URLS[currentPreset];
+
+  if (!host) { showError('login-error','Please enter your server address.'); btn.disabled=false; btn.textContent='Sign In & Continue →'; return; }
+  S.host = host;
+
+  const body = { tb_host: host };
+  if (authMode === 'pass') {
+    body.email    = document.getElementById('tb_email').value.trim();
+    body.password = document.getElementById('tb_password').value;
+  } else {
+    body.token = document.getElementById('tb_token_paste').value.trim();
+  }
+
+  try {
+    const res  = await post('/api/login', body);
+    const data = await res.json();
+    if (!res.ok) { showError('login-error', data.error || 'Login failed.'); return; }
+
+    S.token    = data.token;
+    S.userName = data.name || data.email || 'User';
+    document.getElementById('user-name-display').textContent = S.userName;
+    document.getElementById('user-pill').style.display = '';
+
+    await loadDeviceScreen();
+  } catch(e) {
+    showError('login-error', 'Could not connect. Check your server address and internet connection.');
+  } finally {
+    btn.disabled=false; btn.textContent='Sign In & Continue →';
+  }
+}
+
+/* ─── Load device picker screen ─────────────────────────── */
+async function loadDeviceScreen() {
+  showScreen('device');
+  document.getElementById('device-list-wrap').innerHTML =
+    '<div class="device-empty">Loading your devices…</div>';
+
+  try {
+    const res  = await post('/api/devices', {tb_host:S.host, token:S.token});
+    const data = await res.json();
+    renderDeviceList(data.devices || []);
+    if (data.warning) {
+      document.getElementById('device-list-wrap').innerHTML +=
+        `<div style="font-size:11px;color:var(--g5);padding:6px 14px">${esc(data.warning)}</div>`;
+    }
+  } catch(e) {
+    document.getElementById('device-list-wrap').innerHTML =
+      '<div class="device-empty">Could not load devices. Enter Device ID manually below.</div>';
+  }
+}
+
+function renderDeviceList(devices) {
+  if (!devices.length) {
+    document.getElementById('device-list-wrap').innerHTML =
+      '<div class="device-empty">No devices found. Enter a Device ID manually below.</div>';
+    return;
+  }
+  let html = '<div class="device-list">';
+  devices.forEach(d => {
+    html += `
+      <div class="device-item" onclick="selectDevice('${esc(d.id)}','${esc(d.name)}')" id="di-${d.id}">
+        <div class="di-info">
+          <div class="di-name">${esc(d.name)}</div>
+          <div class="di-type">${esc(d.type || 'Device')}</div>
+        </div>
+        <div class="di-arrow">›</div>
+      </div>`;
+  });
+  html += '</div>';
+  document.getElementById('device-list-wrap').innerHTML = html;
+}
+
+function selectDevice(id, name) {
+  S.deviceId   = id;
+  S.deviceName = name;
+  document.querySelectorAll('.device-item').forEach(el => el.classList.remove('selected'));
+  const el = document.getElementById(`di-${id}`);
+  if (el) el.classList.add('selected');
+}
+
+function useManualId() {
+  const v = document.getElementById('manual_device_id').value.trim();
+  if (!v) { showError('device-error','Please paste or type a Device ID.'); return; }
+  S.deviceId   = v;
+  S.deviceName = 'Device ' + v.slice(0,8) + '…';
+  document.querySelectorAll('.device-item').forEach(el => el.classList.remove('selected'));
+  hideError('device-error');
+  document.getElementById('manual_device_id').style.borderColor = 'var(--b)';
+}
+
+function selectTime(key, btn) {
+  S.timeRange = key;
+  document.querySelectorAll('.time-opt').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function goBack() { showScreen('connect'); }
+function changeDevice() { loadDeviceScreen(); }
+
+/* ─── Generate Dashboard ─────────────────────────────────── */
+async function generateDashboard() {
+  if (!S.deviceId) { showError('device-error','Please select or enter a device.'); return; }
+  hideError('device-error');
+
+  // Set sidebar device info
+  document.getElementById('sid-name').textContent = S.deviceName;
+  document.getElementById('sid-type').textContent = '';
+  document.getElementById('sid-meta').textContent = '';
+
+  showScreen('dashboard');
+  resetPipeline();
+  destroyCharts();
+  clearLog();
+
+  document.getElementById('dash-main').innerHTML = `
+    <div class="running-state">
+      <div class="running-glyph">◌</div>
+      <p>Analysing your device data with AI…</p>
+      <p class="flow">Data Fetcher → Analyser → AI Chart Picker → Dashboard Builder</p>
+    </div>`;
+
+  setPipelineStatus('DataFetcher','running');
+
+  try {
+    const res  = await post('/run', {tb_host:S.host, tb_token:S.token,
+                                      device_id:S.deviceId, time_range:S.timeRange});
+    const data = await res.json();
+
+    applyPipelineStatuses(data.agent_statuses || {});
+
+    if (data.session_id) {
+      try {
+        const lr   = await fetch(`/logs/${data.session_id}`);
+        const logs = await lr.json();
+        clearLog();
+        logs.forEach(l => {
+          const t = new Date(l.created_at*1000).toLocaleTimeString('en',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+          appendLog(`<span class="le-time">[${t}]</span> <span class="le-agent">${esc(l.agent_name)}</span> — ${esc(l.message)}`);
+        });
+      } catch(e){}
+    }
+
+    if (!res.ok || (!data.dashboard_data && data.error)) {
+      document.getElementById('dash-main').innerHTML =
+        `<div class="notice error"><span class="n-icon">⚠</span><div><strong>Error</strong>${esc(data.error||'Something went wrong.')}</div></div>`;
+      return;
+    }
+
+    // Update sidebar
+    const d = data.dashboard_data;
+    document.getElementById('sid-name').textContent = d.device_name || S.deviceName;
+    document.getElementById('sid-type').textContent = d.device_type || '';
+    document.getElementById('sid-meta').innerHTML =
+      `Time: ${esc(d.time_range_label)}<br>` +
+      `Sensors: ${d.numeric_count} numeric · ${d.boolean_count} on/off · ${d.string_count} text<br>` +
+      `Points: ${(d.total_points||0).toLocaleString()}`;
+
+    renderDashboard(data.dashboard_data, data.errors||[], data.warnings||[]);
+
+  } catch(e) {
+    document.getElementById('dash-main').innerHTML =
+      `<div class="notice error"><span class="n-icon">⚠</span><div><strong>Connection Error</strong>${esc(e.message)}</div></div>`;
+  }
+}
+
+async function rerunDashboard() {
+  if (!S.deviceId || !S.token) return;
+  await generateDashboard();
+}
+
+/* ─── Pipeline status ────────────────────────────────────── */
+function resetPipeline() {
+  ['DataFetcher','DataCleaner','VizRecommender','DashboardBuilder'].forEach(n => {
+    const el = document.getElementById(`ps-${n}`);
+    if (!el) return;
+    el.className = 'p-step';
+    el.querySelector('.p-status').textContent = 'idle';
+  });
+}
+function setPipelineStatus(name, status) {
+  const el = document.getElementById(`ps-${name}`);
+  if (!el) return;
+  el.className = `p-step ${status}`;
+  el.querySelector('.p-status').textContent =
+    status==='pending'?'queued':status==='done'?'done':status==='error'?'error':status;
+}
+function applyPipelineStatuses(statuses) {
+  Object.entries(statuses).forEach(([n,s]) => setPipelineStatus(n,s));
+}
+
+/* ─── Log ────────────────────────────────────────────────── */
+function appendLog(html) {
+  const box = document.getElementById('agent-log');
+  box.innerHTML += `<div class="log-entry">${html}</div>`;
+  box.scrollTop = box.scrollHeight;
+}
+function clearLog() {
+  document.getElementById('agent-log').innerHTML = '';
+}
+
+/* ─── Render Dashboard ───────────────────────────────────── */
+function renderDashboard(d, errors, warnings) {
+  let html = '';
+  const fa = new Date(d.fetched_at).toLocaleString();
+
+  // Header
+  html += `
+    <div class="dash-hdr">
+      <div>
+        <div class="dh-title">${esc(d.device_name)}</div>
+        <div class="dh-meta">
+          ${d.device_type?'Type: '+esc(d.device_type)+' &nbsp;·&nbsp;':''}
+          Last updated: ${fa}
+        </div>
+      </div>
+      <div class="dh-badges">
+        <span class="badge fill">${esc(d.time_range_label)}</span>
+        ${d.numeric_count?`<span class="badge">${d.numeric_count} sensors</span>`:''}
+        ${d.boolean_count?`<span class="badge">${d.boolean_count} on/off</span>`:''}
+        ${d.string_count?`<span class="badge">${d.string_count} text</span>`:''}
+      </div>
+    </div>`;
+
+  // Notices
+  errors.forEach(e  => html += `<div class="notice error"><span class="n-icon">⚠</span><div><strong>Warning</strong>${esc(e)}</div></div>`);
+  warnings.forEach(w => html += `<div class="notice"><span class="n-icon">ℹ</span><div><strong>Note</strong>${esc(w)}</div></div>`);
+
+  // Summary strip
+  html += `
+    <div class="summary-strip">
+      <div class="sum-cell"><div class="sum-num">${d.total_tele_keys}</div><div class="sum-lbl">Data Streams</div></div>
+      <div class="sum-cell"><div class="sum-num">${d.total_attr_keys}</div><div class="sum-lbl">Device Settings</div></div>
+      <div class="sum-cell"><div class="sum-num">${(d.total_points||0).toLocaleString()}</div><div class="sum-lbl">Data Points</div></div>
+      <div class="sum-cell"><div class="sum-num">${(d.patterns||[]).length}</div><div class="sum-lbl">Insights Found</div></div>
+    </div>`;
+
+  // KPI cards
+  if (d.kpi_cards?.length) {
+    html += `<div class="sec-hdr"><span class="sec-title">Sensor Readings</span><span class="sec-count">${d.kpi_cards.length} sensors</span></div>`;
+    html += '<div class="kpi-grid">';
+    d.kpi_cards.forEach(k => {
+      const tc = k.trend==='rising'?'rising':k.trend==='falling'?'falling':'';
+      const ts = k.trend==='rising'?'↑ rising':k.trend==='falling'?'↓ falling':'→ stable';
+      html += `
+        <div class="kpi-card">
+          <div class="kc-label">${esc(k.label)}</div>
+          <div class="kc-val">${fmtNum(k.avg)}<span class="kc-unit">${k.unit?' '+esc(k.unit):''}</span></div>
+          <div class="kc-range"><span>Min ${fmtNum(k.min)}</span><span>Max ${fmtNum(k.max)}</span></div>
+          <div class="kc-footer">
+            <span class="tag ${tc}">${ts}</span>
+            ${k.anomaly_count>0?`<span class="tag warn">${k.anomaly_count} anomalies</span>`:''}
+          </div>
+        </div>`;
+    });
+    html += '</div>';
+  }
+
+  // Boolean cards
+  if (d.bool_cards?.length) {
+    html += `<div class="sec-hdr"><span class="sec-title">On / Off Status</span><span class="sec-count">${d.bool_cards.length} sensors</span></div>`;
+    html += '<div class="bool-grid">';
+    d.bool_cards.forEach(b => {
+      const on = b.last_value;
+      html += `
+        <div class="bool-card">
+          <div class="bc-label">${esc(b.label)}</div>
+          <div class="bc-status">
+            <div class="bc-dot ${on?'on':'off'}"></div>
+            <div class="bc-state">${on?'Currently ON':'Currently OFF'}</div>
+          </div>
+          <div class="bc-bar"><div class="bc-fill" style="width:${b.true_pct}%"></div></div>
+          <div class="bc-pcts"><span>ON ${b.true_pct}% of the time</span><span>OFF ${100-b.true_pct}%</span></div>
+        </div>`;
+    });
+    html += '</div>';
+  }
+
+  // String cards
+  if (d.string_cards?.length) {
+    html += `<div class="sec-hdr"><span class="sec-title">Data &amp; States</span><span class="sec-count">${d.string_cards.length} sensors</span></div>`;
+    html += '<div class="str-grid">';
+    d.string_cards.forEach(sc => {
+      const maxC = sc.top.length ? Math.max(...sc.top.map(x=>x.c)) : 1;
+      html += `
+        <div class="str-card">
+          <div class="sc-label">${esc(sc.label)}</div>
+          <div class="sc-latest">Latest: ${esc(sc.latest)}</div>
+          ${sc.top.map(t=>`
+            <div class="sc-bar-row">
+              <span class="sc-val" title="${esc(t.v)}">${esc(t.v)}</span>
+              <div class="sc-bar-bg"><div class="sc-bar-fill" style="width:${Math.round(t.c/maxC*100)}%"></div></div>
+              <span class="sc-cnt">${t.c}</span>
+            </div>`).join('')}
+          <div style="font-family:var(--mono);font-size:9px;color:var(--g5);margin-top:6px">${sc.unique} unique values · ${sc.total} records</div>
+        </div>`;
+    });
+    html += '</div>';
+  }
+
+  // AI-selected highlights
+  const charts      = d.chart_blocks||[];
+  const kpiBlocks   = charts.filter(c=>c.render_type==='kpi_single');
+  const boolBlocks  = charts.filter(c=>c.render_type==='boolean_status');
+  const chartBlocks = charts.filter(c=>c.render_type==='chartjs');
+
+  if (kpiBlocks.length || boolBlocks.length) {
+    html += `<div class="sec-hdr"><span class="sec-title">AI-Selected Highlights</span><span class="sec-count">${kpiBlocks.length+boolBlocks.length} cards</span></div>`;
+    html += '<div class="highlight-grid">';
+    kpiBlocks.forEach(b => {
+      const tc=b.trend==='rising'?'rising':b.trend==='falling'?'falling':'';
+      const ts=b.trend==='rising'?'↑ rising':b.trend==='falling'?'↓ falling':'→ stable';
+      html += `
+        <div class="hl-kpi">
+          <div class="hk-label">${esc(b.title)}</div>
+          <div class="hk-val">${fmtNum(b.value)}<span class="hk-unit">${b.unit?' '+esc(b.unit):''}</span></div>
+          <span class="tag ${tc}">${ts}</span>
+          <div class="hk-desc">${esc(b.desc)}</div>
+        </div>`;
+    });
+    boolBlocks.forEach(b => {
+      const on=b.last_value;
+      html += `
+        <div class="hl-bool">
+          <div class="hb-label">${esc(b.title)}</div>
+          <div class="hb-state"><div class="hb-dot ${on?'on':'off'}"></div><div class="hb-text">${on?'ON':'OFF'}</div></div>
+          <div class="hb-bar"><div class="hb-fill" style="width:${b.true_pct}%"></div></div>
+          <div class="hb-pcts"><span>${b.true_pct}% on</span><span>${b.false_pct}% off</span></div>
+          <div class="hb-desc">${esc(b.desc)}</div>
+        </div>`;
+    });
+    html += '</div>';
+  }
+
+  // AI charts
+  if (chartBlocks.length) {
+    html += `<div class="sec-hdr"><span class="sec-title">AI-Recommended Charts</span><span class="sec-count">${chartBlocks.length} charts</span></div>`;
+    html += '<div class="chart-grid">';
+    chartBlocks.forEach(c => {
+      html += `
+        <div class="chart-cell">
+          <div class="cc-hdr">
+            <div>
+              <div class="cc-title">${esc(c.title)}</div>
+              <div class="cc-desc">${esc(c.desc||'')}</div>
+            </div>
+            <span class="cc-type">${esc(c.chart_type)}</span>
+          </div>
+          <div class="chart-wrap"><canvas id="cv-${c.id}"></canvas></div>
+        </div>`;
+    });
+    html += '</div>';
+  }
+
+  // Patterns / Insights
+  if (d.patterns?.length) {
+    html += `
+      <div class="patterns-box">
+        <div class="pb-hdr">
+          <span class="pb-title">AI Insights &amp; Patterns</span>
+          <span style="font-family:var(--mono);font-size:9px;color:var(--g5)">${d.patterns.length} found</span>
+        </div>
+        <div class="pb-body">
+          ${d.patterns.map(p=>`
+            <div class="pat-row">
+              <span class="pat-badge ${p.severity==='warning'?'warning':''}">${esc(p.type)}</span>
+              <span class="pat-text">${esc(p.description)}</span>
+            </div>`).join('')}
+        </div>
+      </div>`;
+  }
+
+  // Device attributes
+  if (d.attr_table?.length) {
+    html += `
+      <div class="attr-box">
+        <div class="ab-hdr">
+          <span class="ab-title">Device Settings &amp; Info</span>
+          <span style="font-family:var(--mono);font-size:9px;color:var(--g5)">${d.attr_table.length} entries</span>
+        </div>
+        <table class="attr-table">
+          <thead><tr><th>Setting</th><th>Value</th><th>Source</th></tr></thead>
+          <tbody>
+            ${d.attr_table.slice(0,30).map(a=>`
+              <tr>
+                <td>${esc(a.label||a.key)}</td>
+                <td>${esc(a.value)}</td>
+                <td><span class="scope-tag">${esc(a.scope)}</span></td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  }
+
+  document.getElementById('dash-main').innerHTML = html;
+
+  // Mount Chart.js
+  chartBlocks.forEach(c => {
+    try {
+      const canvas = document.getElementById(`cv-${c.id}`);
+      if (!canvas || !c.config) return;
+      activeCharts.push(new Chart(canvas, c.config));
+    } catch(e) { console.warn('Chart render failed:', c.id, e); }
+  });
+}
+
+/* ─── Helpers ────────────────────────────────────────────── */
+function fmtNum(n) {
+  if (n===undefined||n===null) return '—';
+  if (Math.abs(n)>=100000) return n.toLocaleString(undefined,{maximumFractionDigits:0});
+  if (Math.abs(n)<0.001&&n!==0) return n.toExponential(2);
+  return parseFloat(n.toPrecision(5)).toString();
+}
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function showError(id, msg) {
+  document.getElementById(id).style.display = '';
+  document.getElementById(id+'-msg').textContent = msg;
+}
+function hideError(id) {
+  document.getElementById(id).style.display = 'none';
+}
+function destroyCharts() {
+  activeCharts.forEach(c => { try{c.destroy()}catch(e){} });
+  activeCharts = [];
+}
+async function post(url, body) {
+  return fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+}
+function logout() {
+  S.token=''; S.userName=''; S.deviceId=''; S.host='';
+  document.getElementById('user-pill').style.display='none';
+  document.getElementById('tb_email').value='';
+  document.getElementById('tb_password').value='';
+  document.getElementById('tb_token_paste').value='';
+  showScreen('connect');
+}
+</script>
+
+</body>
+</html>
