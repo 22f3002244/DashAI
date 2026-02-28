@@ -101,7 +101,7 @@ def agent_data_cleaner(state):
                 if trend in ("rising","falling"):
                     patterns.append({"key":key,"type":"trend","severity":"info",
                         "description":f"'{_pretty(key)}' is trending {trend} over the selected period."})
-                if len(anomalies) > 2:
+                if len(anomalies) > 0:
                     patterns.append({"key":key,"type":"anomaly","severity":"warning",
                         "description":f"'{_pretty(key)}' has {len(anomalies)} unusual readings that stand out from the normal range."})
                 if std == 0 and n > 1:
