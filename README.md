@@ -14,7 +14,7 @@ An AI-powered IoT analytics platform that connects to your ThingsBoard instance.
   4. **DashboardBuilder** — Assembles the final Dash AI view
 - **Fallback Mode** — Smart default charts if AI generation is unavailable
 - **Secure by Design** — AI API keys are handled server-side
-- **User Authentication** — Local SQLite-based user registry to save your setup
+- **User Authentication** — PostgreSQL registry (default for production via Neon) or local SQLite fallback to save your setup
 
 ## Project Structure
 
@@ -47,9 +47,11 @@ An AI-powered IoT analytics platform that connects to your ThingsBoard instance.
 # 1. Install dependencies
 pip install -r requirements.txt
 
-# 2. Add your Groq API key to .env
-#    Get a free key at https://console.groq.com
+# 2. Add your secrets to .env
+#    Get Groq key at https://console.groq.com
+#    Get Neon DB url at https://neon.tech
 GROQ_API_KEY=gsk_...
+DATABASE_URL=postgres://user:pass@ep-hostname.neon.tech/neondb?sslmode=require
 
 # 3. Run the server
 python app.py

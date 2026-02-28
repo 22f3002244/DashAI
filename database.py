@@ -1,64 +1,115 @@
 import os
 import sqlite3
 import time
-
-DB_PATH = os.path.join(os.path.dirname(__file__), "dashboard.db")
+import psycopg2
+from psycopg2.extras import DictCursor
+from config import DATABASE_URL
 
 def get_db():
-    c = sqlite3.connect(DB_PATH)
-    c.row_factory = sqlite3.Row
-    return c
+    if DATABASE_URL:
+        # Use PostgreSQL (Neon)
+        conn = psycopg2.connect(DATABASE_URL)
+        return conn
+    else:
+        # Fallback to SQLite
+        db_path = os.path.join(os.path.dirname(__file__), "dashboard.db")
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        return conn
 
 def init_db():
-    c = get_db()
-    c.executescript("""
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            email TEXT UNIQUE,
-            password_hash TEXT
-        );
-        CREATE TABLE IF NOT EXISTS sessions (
-            id TEXT PRIMARY KEY, created_at REAL,
-            tb_host TEXT, device_id TEXT, time_range TEXT
-        );
-        CREATE TABLE IF NOT EXISTS agent_logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            session_id TEXT, agent_name TEXT,
-            status TEXT, message TEXT, created_at REAL
-        );
-    """)
-    c.commit()
-    c.close()
+    conn = get_db()
+    cur = conn.cursor()
+    
+    if DATABASE_URL:
+        # PostgreSQL syntax
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                email TEXT UNIQUE,
+                password_hash TEXT
+            );
+            CREATE TABLE IF NOT EXISTS sessions (
+                id TEXT PRIMARY KEY, 
+                created_at DOUBLE PRECISION,
+                tb_host TEXT, 
+                device_id TEXT, 
+                time_range TEXT
+            );
+            CREATE TABLE IF NOT EXISTS agent_logs (
+                id SERIAL PRIMARY KEY,
+                session_id TEXT, 
+                agent_name TEXT,
+                status TEXT, 
+                message TEXT, 
+                created_at DOUBLE PRECISION
+            );
+        """)
+    else:
+        # SQLite syntax
+        cur.executescript("""
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email TEXT UNIQUE,
+                password_hash TEXT
+            );
+            CREATE TABLE IF NOT EXISTS sessions (
+                id TEXT PRIMARY KEY, created_at REAL,
+                tb_host TEXT, device_id TEXT, time_range TEXT
+            );
+            CREATE TABLE IF NOT EXISTS agent_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT, agent_name TEXT,
+                status TEXT, message TEXT, created_at REAL
+            );
+        """)
+    conn.commit()
+    cur.close()
+    conn.close()
 
 def log_agent(sid, name, status, msg):
-    c = get_db()
-    c.execute(
-        "INSERT INTO agent_logs (session_id,agent_name,status,message,created_at) VALUES (?,?,?,?,?)",
+    conn = get_db()
+    cur = conn.cursor()
+    placeholder = "%s" if DATABASE_URL else "?"
+    cur.execute(
+        f"INSERT INTO agent_logs (session_id,agent_name,status,message,created_at) VALUES ({placeholder},{placeholder},{placeholder},{placeholder},{placeholder})",
         (sid, name, status, msg, time.time())
     )
-    c.commit()
-    c.close()
+    conn.commit()
+    cur.close()
+    conn.close()
 
 def create_user(email, password_hash):
-    c = get_db()
+    conn = get_db()
+    cur = conn.cursor()
+    placeholder = "%s" if DATABASE_URL else "?"
     try:
-        c.execute("INSERT INTO users (email, password_hash) VALUES (?, ?)",
+        cur.execute(f"INSERT INTO users (email, password_hash) VALUES ({placeholder}, {placeholder})",
                   (email, password_hash))
-        c.commit()
+        conn.commit()
         return True
-    except sqlite3.IntegrityError:
+    except (sqlite3.IntegrityError, psycopg2.IntegrityError):
         return False
     finally:
-        c.close()
+        cur.close()
+        conn.close()
 
 def get_user_by_email(email):
-    c = get_db()
-    user = c.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
-    c.close()
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=DictCursor) if DATABASE_URL else conn.cursor()
+    placeholder = "%s" if DATABASE_URL else "?"
+    cur.execute(f"SELECT * FROM users WHERE email = {placeholder}", (email,))
+    user = cur.fetchone()
+    cur.close()
+    conn.close()
     return user
 
 def get_user_by_id(user_id):
-    c = get_db()
-    user = c.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
-    c.close()
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=DictCursor) if DATABASE_URL else conn.cursor()
+    placeholder = "%s" if DATABASE_URL else "?"
+    cur.execute(f"SELECT * FROM users WHERE id = {placeholder}", (user_id,))
+    user = cur.fetchone()
+    cur.close()
+    conn.close()
     return user
