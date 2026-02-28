@@ -1,11 +1,22 @@
 import requests
-from flask import Blueprint, render_template, request, jsonify, session
+from functools import wraps
+from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for
+from werkzeug.security import generate_password_hash, check_password_hash
 
 from config import GROQ_API_KEY, TB_PRESETS, TIME_RANGES
-from database import get_db, log_agent
+from database import get_db, log_agent, create_user, get_user_by_email, get_user_by_id
 from pipeline import run_pipeline
 
 bp = Blueprint("main", __name__)
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if "user_id" not in session:
+            return redirect(url_for("main.login", next=request.url))
+        return f(*args, **kwargs)
+    return decorated_function
+
 
 def tb_login(host, username, password):
     r = requests.post(
@@ -20,11 +31,56 @@ def tb_login(host, username, password):
 
 @bp.route("/")
 def index():
+    if "user_id" in session:
+        return redirect(url_for("main.dashboard"))
+    return render_template("landing.html")
+
+@bp.route("/register", methods=["GET", "POST"])
+def register():
+    if request.method == "POST":
+        email = request.form.get("email", "").strip()
+        password = request.form.get("password", "")
+
+        if not email or not password:
+            return render_template("register.html", error="All fields are required")
+
+        if create_user(email, generate_password_hash(password)):
+            return redirect(url_for("main.login"))
+        else:
+            return render_template("register.html", error="Email already exists")
+
+    return render_template("register.html")
+
+@bp.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        email = request.form.get("email", "").strip()
+        password = request.form.get("password", "")
+
+        user = get_user_by_email(email)
+        if user and check_password_hash(user["password_hash"], password):
+            session["user_id"] = user["id"]
+            return redirect(url_for("main.dashboard"))
+        else:
+            return render_template("login.html", error="Invalid credentials")
+
+    return render_template("login.html")
+
+@bp.route("/logout")
+def logout():
+    session.pop("user_id", None)
+    return redirect(url_for("main.index"))
+
+@bp.route("/dashboard")
+@login_required
+def dashboard():
     groq_configured = bool(GROQ_API_KEY and GROQ_API_KEY != "your_groq_api_key_here")
-    return render_template("index.html",
+    user = get_user_by_id(session["user_id"])
+    return render_template("dashboard.html",
                            time_ranges=TIME_RANGES,
                            tb_presets=TB_PRESETS,
-                           groq_configured=groq_configured)
+                           groq_configured=groq_configured,
+                           user_email=user["email"])
 
 @bp.route("/api/login", methods=["POST"])
 def api_login():
@@ -68,6 +124,7 @@ def api_login():
         return jsonify({"error": f"Login failed: {e}"}), 400
 
 @bp.route("/api/devices", methods=["POST"])
+@login_required
 def api_devices():
     d     = request.json or {}
     host  = d.get("tb_host","").strip().rstrip("/")
@@ -96,6 +153,7 @@ def api_devices():
         return jsonify({"devices": [], "warning": f"Device list unavailable: {e}"}), 200
 
 @bp.route("/run", methods=["POST"])
+@login_required
 def run_dashboard():
     d          = request.json or {}
     tb_host    = d.get("tb_host","").strip().rstrip("/")
@@ -120,6 +178,7 @@ def run_dashboard():
                     "dashboard_data":  state.get("dashboard_data",{})})
 
 @bp.route("/logs/<session_id>")
+@login_required
 def get_logs(session_id):
     c = get_db()
     rows = c.execute(

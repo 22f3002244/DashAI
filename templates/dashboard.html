@@ -1,0 +1,1509 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard | Dash AI{% endblock %}
+
+{% block extra_css %}
+<style>
+  ::-webkit-scrollbar { width: 4px; height: 4px }
+  ::-webkit-scrollbar-thumb { background: var(--gray-200); border-radius: 4px }
+
+  /* ── Screen system ── */
+  .screen { display: none }
+  .screen.active { display: flex }
+
+  /* ══════════════════════════════════════════════
+   SCREEN 1 — CONNECT
+  ══════════════════════════════════════════════ */
+  #screen-connect {
+    min-height: calc(100vh - 62px);
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    background: var(--off-white);
+  }
+
+  .connect-wrap {
+    width: 100%;
+    max-width: 520px;
+  }
+
+  /* Step indicator */
+  .step-indicator {
+    display: flex;
+    align-items: center;
+    margin-bottom: 2rem;
+  }
+
+  .step-dot {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--gray-400);
+    white-space: nowrap;
+  }
+
+  .step-dot.active { color: var(--black) }
+  .step-dot.done { color: var(--black) }
+
+  .step-dot .sdot {
+    width: 28px;
+    height: 28px;
+    border: 1.5px solid var(--gray-200);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+    flex-shrink: 0;
+    background: var(--white);
+    transition: all 0.2s;
+  }
+
+  .step-dot.active .sdot {
+    background: var(--black);
+    border-color: var(--black);
+    color: var(--white);
+  }
+
+  .step-dot.done .sdot {
+    background: var(--gray-100);
+    border-color: var(--gray-300);
+    color: var(--black);
+  }
+
+  .step-line {
+    flex: 1;
+    height: 1px;
+    background: var(--gray-200);
+    margin: 0 10px;
+  }
+
+  .step-line.done { background: var(--black) }
+
+  /* Connect card */
+  .connect-card {
+    background: var(--white);
+    border: var(--border);
+    border-radius: var(--radius-lg);
+    padding: 36px;
+    box-shadow: var(--shadow);
+  }
+
+  .connect-card h2 {
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    margin-bottom: .4rem;
+    color: var(--black);
+  }
+
+  .connect-card .subtitle {
+    font-size: 13px;
+    color: var(--gray-400);
+    margin-bottom: 1.75rem;
+    line-height: 1.65;
+  }
+
+  .field-group {
+    margin-bottom: 1rem;
+  }
+
+  .field-group label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--gray-600);
+    margin-bottom: .4rem;
+    letter-spacing: 0.01em;
+  }
+
+  .field-group .field-hint {
+    font-size: 11px;
+    color: var(--gray-400);
+    margin-top: .3rem;
+  }
+
+  .fi {
+    width: 100%;
+    border: 1.5px solid var(--gray-200);
+    padding: 10px 14px;
+    font-size: 13px;
+    font-family: var(--font);
+    outline: none;
+    background: var(--white);
+    color: var(--black);
+    border-radius: var(--radius-sm);
+    transition: all 0.15s;
+  }
+
+  .fi:focus { border-color: var(--black); box-shadow: 0 0 0 3px rgba(17,17,17,.05); }
+  .fi::placeholder { color: var(--gray-400); }
+
+  /* Auth tabs */
+  .auth-tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 1.25rem;
+    border-bottom: var(--border);
+  }
+
+  .auth-tab {
+    padding: 9px 18px;
+    font-size: 13px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    color: var(--gray-400);
+    font-weight: 500;
+    transition: all 0.15s;
+  }
+
+  .auth-tab.active {
+    border-bottom-color: var(--black);
+    color: var(--black);
+    font-weight: 600;
+  }
+
+  .divider-or {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 1rem 0;
+    font-size: 11px;
+    color: var(--gray-400);
+  }
+
+  .divider-or::before, .divider-or::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--gray-200);
+  }
+
+  .btn-full {
+    width: 100%;
+    padding: 12px;
+    font-size: 13px;
+    font-weight: 600;
+    border: 1.5px solid var(--gray-200);
+    cursor: pointer;
+    font-family: var(--font);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border-radius: var(--radius-pill);
+    transition: all 0.18s;
+    letter-spacing: -0.01em;
+  }
+
+  .btn-full.primary {
+    background: var(--black);
+    color: var(--white);
+    border-color: var(--black);
+  }
+
+  .btn-full.primary:hover {
+    background: var(--gray-600);
+    border-color: var(--gray-600);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(0,0,0,.15);
+  }
+
+  .btn-full.primary:disabled {
+    background: var(--gray-300);
+    border-color: var(--gray-300);
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+
+  .btn-full.secondary {
+    background: var(--white);
+    color: var(--black);
+    border-color: var(--gray-200);
+  }
+
+  .btn-full.secondary:hover {
+    background: var(--gray-100);
+    border-color: var(--gray-300);
+  }
+
+  .error-inline {
+    border: 1px solid #fecaca;
+    background: #fef2f2;
+    padding: 10px 14px;
+    margin-bottom: 1rem;
+    font-size: 12px;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    border-radius: var(--radius-sm);
+    color: #b91c1c;
+  }
+
+  .error-inline .ei-icon { font-size: 16px; flex-shrink: 0 }
+
+  .demo-note {
+    margin-top: 1rem;
+    padding: 12px 16px;
+    background: var(--gray-100);
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--gray-500);
+    border: var(--border);
+    border-radius: var(--radius-sm);
+  }
+
+  .demo-note strong { color: var(--black) }
+
+  /* ══════════════════════════════════════════════
+   SCREEN 2 — PICK DEVICE
+  ══════════════════════════════════════════════ */
+  #screen-device {
+    min-height: calc(100vh - 62px);
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    background: var(--off-white);
+  }
+
+  .device-wrap { width: 100%; max-width: 520px }
+
+  .manual-id { display: flex; gap: 8px; margin-bottom: 1rem }
+  .manual-id input { flex: 1 }
+
+  /* ══════════════════════════════════════════════
+   SCREEN 3 — DASHBOARD
+  ══════════════════════════════════════════════ */
+  #screen-dashboard {
+    flex-direction: column;
+    min-height: calc(100vh - 62px);
+  }
+
+  .dash-layout {
+    display: grid;
+    grid-template-columns: 256px 1fr;
+    flex: 1;
+  }
+
+  /* Sidebar */
+  .dash-sidebar {
+    border-right: var(--border);
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    position: sticky;
+    top: 62px;
+    height: calc(100vh - 62px);
+    overflow-y: auto;
+    background: var(--white);
+  }
+
+  .ds-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--gray-400);
+    margin-bottom: .6rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .ds-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--gray-100);
+  }
+
+  .device-info-card {
+    border: var(--border);
+    padding: 14px;
+    border-radius: var(--radius);
+    background: var(--gray-100);
+  }
+
+  .dic-name {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    margin-bottom: 2px;
+    color: var(--black);
+  }
+
+  .dic-type { font-size: 11px; color: var(--gray-400); font-family: var(--mono) }
+  .dic-meta { font-size: 11px; color: var(--gray-500); margin-top: 8px; line-height: 1.9; font-family: var(--mono) }
+
+  /* Pipeline */
+  .pipeline-steps { display: flex; flex-direction: column; gap: 5px }
+
+  .p-step {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 9px 12px;
+    border: var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--white);
+    transition: all 0.15s;
+  }
+
+  .p-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--gray-200);
+    flex-shrink: 0;
+  }
+
+  .p-step.running { border-color: var(--black); background: var(--gray-100) }
+  .p-step.running .p-dot { background: var(--black); animation: blink 1s ease-in-out infinite }
+  .p-step.done { border-color: var(--gray-300) }
+  .p-step.done .p-dot { background: var(--black) }
+  .p-step.error .p-dot { background: var(--gray-300) }
+  .p-step.skipped { opacity: .45 }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1 }
+    50% { opacity: .15 }
+  }
+
+  .p-name { font-size: 11px; flex: 1; line-height: 1.35; color: var(--black); font-family: var(--mono) }
+  .p-status { font-size: 9px; text-transform: uppercase; letter-spacing: .06em; color: var(--gray-400); font-family: var(--mono) }
+  .p-step.done .p-status { color: var(--black) }
+  .p-step.running .p-status { color: var(--black) }
+
+  /* Agent log */
+  .agent-log {
+    border: var(--border);
+    padding: 10px 12px;
+    font-family: var(--mono);
+    font-size: 10px;
+    line-height: 1.9;
+    color: var(--gray-500);
+    max-height: 160px;
+    overflow-y: auto;
+    border-radius: var(--radius-sm);
+    background: var(--gray-100);
+  }
+
+  .log-entry .le-agent { color: var(--black); font-weight: 600 }
+  .log-entry .le-time { color: var(--gray-400) }
+
+  .sidebar-actions { display: flex; flex-direction: column; gap: 6px }
+
+  .sb-btn {
+    border: var(--border);
+    background: var(--white);
+    padding: 9px 14px;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: var(--font);
+    text-align: left;
+    width: 100%;
+    border-radius: var(--radius-sm);
+    transition: all 0.15s;
+    color: var(--black);
+    font-weight: 500;
+  }
+
+  .sb-btn:hover { background: var(--gray-100); border-color: var(--gray-300) }
+
+  .sb-btn.primary-sb {
+    background: var(--black);
+    color: var(--white);
+    border-color: var(--black);
+    font-weight: 600;
+  }
+
+  .sb-btn.primary-sb:hover {
+    background: var(--gray-600);
+    border-color: var(--gray-600);
+  }
+
+  /* Main dashboard area */
+  .dash-main {
+    padding: 2rem 2.25rem;
+    overflow-y: auto;
+    background: var(--off-white);
+  }
+
+  /* Running state */
+  .running-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 400px;
+    text-align: center;
+    gap: 12px;
+  }
+
+  .running-glyph {
+    font-size: 40px;
+    color: var(--gray-300);
+    line-height: 1;
+  }
+
+  .running-state p { font-size: 13px; color: var(--gray-500) }
+  .running-state .flow { font-family: var(--mono); font-size: 10px; color: var(--gray-400) }
+
+  /* Dashboard header */
+  .dash-hdr {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    border-bottom: var(--border);
+    padding-bottom: 1.25rem;
+    margin-bottom: 1.75rem;
+  }
+
+  .dh-title { font-size: 22px; font-weight: 800; letter-spacing: -0.04em; color: var(--black) }
+  .dh-meta { font-family: var(--mono); font-size: 10px; color: var(--gray-400); margin-top: 4px; line-height: 1.9 }
+
+  .dh-badges { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; align-items: flex-start }
+
+  .badge {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 4px 11px;
+    border: var(--border);
+    color: var(--gray-500);
+    border-radius: var(--radius-pill);
+    background: var(--white);
+  }
+
+  .badge.fill { background: var(--black); color: var(--white); border-color: var(--black) }
+
+  /* Summary strip */
+  .summary-strip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    border: var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    margin-bottom: 1.75rem;
+    background: var(--white);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .sum-cell {
+    padding: 18px 20px;
+    border-right: var(--border);
+    background: var(--white);
+    transition: background 0.15s;
+  }
+
+  .sum-cell:last-child { border-right: none }
+  .sum-cell:hover { background: var(--gray-100) }
+
+  .sum-num {
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    line-height: 1;
+    margin-bottom: 4px;
+    color: var(--black);
+  }
+
+  .sum-lbl { font-size: 11px; color: var(--gray-400); font-weight: 500 }
+
+  /* Section heading */
+  .sec-hdr {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+  }
+
+  .sec-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--gray-500) }
+  .sec-count { font-size: 11px; color: var(--gray-400) }
+
+  /* KPI grid */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px;
+    margin-bottom: 1.75rem;
+  }
+
+  .kpi-card {
+    background: var(--white);
+    border: var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow 0.2s, transform 0.2s;
+  }
+
+  .kpi-card:hover { box-shadow: var(--shadow); transform: translateY(-1px) }
+
+  .kc-label {
+    font-size: 10px;
+    color: var(--gray-400);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    margin-bottom: 6px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .kc-val {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    line-height: 1;
+    margin-bottom: 4px;
+    color: var(--black);
+  }
+
+  .kc-unit { font-size: 13px; color: var(--gray-400); font-weight: 400 }
+
+  .kc-range {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: var(--gray-400);
+    margin-bottom: 8px;
+    font-family: var(--mono);
+  }
+
+  .kc-footer { display: flex; gap: 5px; flex-wrap: wrap }
+
+  .tag {
+    font-size: 10px;
+    font-weight: 500;
+    padding: 2px 8px;
+    border: var(--border);
+    color: var(--gray-500);
+    border-radius: var(--radius-pill);
+  }
+
+  .tag.rising { border-color: #d1fae5; background: #f0fdf4; color: #166534 }
+  .tag.falling { border-color: var(--gray-200); color: var(--gray-500) }
+  .tag.warn { border-color: #fef3c7; background: #fffbeb; color: #92400e }
+
+  /* Boolean grid */
+  .bool-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+    margin-bottom: 1.75rem;
+  }
+
+  .bool-card {
+    background: var(--white);
+    border: var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .bc-label { font-size: 10px; color: var(--gray-400); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 10px; font-weight: 600 }
+  .bc-status { display: flex; align-items: center; gap: 8px; margin-bottom: 10px }
+
+  .bc-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0 }
+  .bc-dot.on { background: #22c55e }
+  .bc-dot.off { background: var(--gray-300) }
+
+  .bc-state { font-size: 14px; font-weight: 700; letter-spacing: -0.02em; color: var(--black) }
+
+  .bc-bar { height: 4px; background: var(--gray-100); margin-bottom: 6px; border-radius: 100px }
+  .bc-fill { height: 4px; background: var(--black); border-radius: 100px }
+  .bc-pcts { display: flex; justify-content: space-between; font-size: 10px; color: var(--gray-400); font-family: var(--mono) }
+
+  /* String cards */
+  .str-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 12px;
+    margin-bottom: 1.75rem;
+  }
+
+  .str-card {
+    background: var(--white);
+    border: var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .sc-label { font-size: 10px; color: var(--gray-400); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; font-weight: 600 }
+  .sc-latest { font-size: 12px; margin-bottom: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: var(--mono); color: var(--black) }
+  .sc-bar-row { display: flex; align-items: center; gap: 6px; margin-bottom: 5px }
+  .sc-val { font-family: var(--mono); font-size: 10px; color: var(--gray-600); width: 75px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0 }
+  .sc-bar-bg { flex: 1; height: 3px; background: var(--gray-100); border-radius: 100px }
+  .sc-bar-fill { height: 3px; background: var(--black); border-radius: 100px }
+  .sc-cnt { font-family: var(--mono); font-size: 10px; color: var(--gray-400); width: 28px; text-align: right; flex-shrink: 0 }
+
+  /* Chart grid */
+  .chart-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 12px;
+    margin-bottom: 1.75rem;
+  }
+
+  .chart-cell {
+    background: var(--white);
+    border: var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .cc-hdr { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem }
+  .cc-title { font-size: 14px; font-weight: 700; letter-spacing: -0.02em; color: var(--black) }
+  .cc-desc { font-size: 11px; color: var(--gray-400); margin-top: 3px; line-height: 1.4 }
+
+  .cc-type {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--gray-400);
+    border: var(--border);
+    padding: 3px 8px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    margin-left: 8px;
+    border-radius: var(--radius-pill);
+    font-weight: 500;
+  }
+
+  .chart-wrap { height: 200px }
+
+  /* Highlight grid */
+  .highlight-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+    margin-bottom: 1.75rem;
+  }
+
+  .hl-kpi, .hl-bool {
+    background: var(--white);
+    border: var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .hk-label, .hb-label { font-size: 10px; color: var(--gray-400); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px; font-weight: 600 }
+  .hk-val { font-size: 38px; font-weight: 800; letter-spacing: -0.05em; line-height: 1; margin-bottom: 6px; color: var(--black) }
+  .hk-unit { font-size: 16px; color: var(--gray-400); font-weight: 400 }
+  .hk-desc, .hb-desc { font-size: 11px; color: var(--gray-400); margin-top: 8px }
+
+  .hb-state { display: flex; align-items: center; gap: 8px; margin-bottom: 10px }
+  .hb-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0 }
+  .hb-dot.on { background: #22c55e }
+  .hb-dot.off { background: var(--gray-300) }
+  .hb-text { font-size: 24px; font-weight: 800; letter-spacing: -0.04em; color: var(--black) }
+  .hb-bar { height: 4px; background: var(--gray-100); margin-bottom: 6px; border-radius: 100px }
+  .hb-fill { height: 4px; background: var(--black); border-radius: 100px }
+  .hb-pcts { display: flex; justify-content: space-between; font-size: 10px; color: var(--gray-400); font-family: var(--mono) }
+
+  /* Patterns box */
+  .patterns-box {
+    border: var(--border);
+    margin-bottom: 1.75rem;
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+    background: var(--white);
+  }
+
+  .pb-hdr {
+    border-bottom: var(--border);
+    padding: 12px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--gray-100);
+  }
+
+  .pb-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--black) }
+  .pb-body { padding: .85rem 1rem }
+
+  .pat-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--gray-100);
+  }
+
+  .pat-row:last-child { border-bottom: none }
+
+  .pat-badge {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    padding: 3px 8px;
+    border: var(--border);
+    color: var(--gray-600);
+    flex-shrink: 0;
+    margin-top: 1px;
+    border-radius: var(--radius-pill);
+    font-weight: 600;
+  }
+
+  .pat-badge.warning { border-color: #fef3c7; background: #fffbeb; color: #92400e }
+  .pat-text { font-size: 12px; line-height: 1.55; color: var(--gray-600) }
+
+  /* Attributes */
+  .attr-box {
+    border: var(--border);
+    margin-bottom: 1.75rem;
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+    background: var(--white);
+  }
+
+  .ab-hdr {
+    border-bottom: var(--border);
+    padding: 12px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--gray-100);
+  }
+
+  .ab-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--black) }
+
+  .attr-table { width: 100%; border-collapse: collapse }
+
+  .attr-table th {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--gray-400);
+    padding: 10px 16px;
+    border-bottom: var(--border);
+    text-align: left;
+    background: var(--gray-100);
+  }
+
+  .attr-table td {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--gray-100);
+    vertical-align: top;
+    color: var(--gray-600);
+  }
+
+  .attr-table tr:last-child td { border-bottom: none }
+
+  .scope-tag {
+    font-size: 9px;
+    padding: 2px 8px;
+    border: var(--border);
+    color: var(--gray-500);
+    text-transform: uppercase;
+    border-radius: var(--radius-pill);
+    font-weight: 500;
+  }
+
+  /* Notice boxes */
+  .notice {
+    border: var(--border);
+    padding: .85rem 1rem;
+    margin-bottom: 1rem;
+    font-size: 12px;
+    display: flex;
+    gap: 10px;
+    border-radius: var(--radius-sm);
+    background: var(--gray-100);
+  }
+
+  .notice strong { display: block; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 3px; color: var(--black) }
+  .notice.error { border-color: #fecaca; background: #fef2f2 }
+  .notice .n-icon { font-size: 16px; flex-shrink: 0 }
+
+  /* Responsive */
+  @media(max-width:860px) {
+    .dash-layout { grid-template-columns: 1fr }
+    .dash-sidebar { position: static; height: auto; border-right: none; border-bottom: var(--border) }
+    .summary-strip { grid-template-columns: 1fr 1fr }
+    .chart-grid { grid-template-columns: 1fr }
+    .kpi-grid { grid-template-columns: repeat(2, 1fr) }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- ══════════════════════════════════════════════
+     SCREEN 1 — CONNECT
+══════════════════════════════════════════════ -->
+<div id="screen-connect" class="screen active">
+  <div class="connect-wrap">
+
+    <div class="step-indicator">
+      <div class="step-dot active" id="sdot-1">
+        <div class="sdot">1</div>&nbsp;Connect
+      </div>
+      <div class="step-line" id="sline-1"></div>
+      <div class="step-dot" id="sdot-2">
+        <div class="sdot">2</div>&nbsp;Select Device
+      </div>
+      <div class="step-line" id="sline-2"></div>
+      <div class="step-dot" id="sdot-3">
+        <div class="sdot">3</div>&nbsp;Dashboard
+      </div>
+    </div>
+
+    <div class="connect-card">
+      <h2>Connect to ThingsBoard</h2>
+      <p class="subtitle">ThingsBoard is the IoT platform your devices send data to. Choose your setup below and sign in to see your device data.</p>
+
+      <div class="field-group">
+        <label>ThingsBoard Server</label>
+        <select class="fi" id="preset-select" onchange="onPresetChange(this.value)" style="cursor:pointer">
+          {% for p in tb_presets %}
+          <option value="{{ p.key }}" {% if loop.first %}selected{% endif %}>{{ p.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="field-group" id="host-field" style="display:none">
+        <label>Server Address</label>
+        <input class="fi" id="tb_host_custom" type="url" placeholder="https://your-thingsboard-server.com">
+        <div class="field-hint">The web address of your ThingsBoard installation</div>
+      </div>
+
+      <div class="auth-tabs">
+        <div class="auth-tab active" onclick="switchTab('pass',this)">Sign in with Email</div>
+        <div class="auth-tab" onclick="switchTab('token',this)">Paste Access Token</div>
+      </div>
+
+      <div id="tab-pass">
+        <div class="field-group">
+          <label>Email Address</label>
+          <input class="fi" id="tb_email" type="email" placeholder="your@email.com" autocomplete="email">
+        </div>
+        <div class="field-group">
+          <label>Password</label>
+          <input class="fi" id="tb_password" type="password" placeholder="Your password" autocomplete="current-password"
+            onkeydown="if(event.key==='Enter')doLogin()">
+        </div>
+      </div>
+
+      <div id="tab-token" style="display:none">
+        <div class="field-group">
+          <label>Access Token (JWT)</label>
+          <input class="fi" id="tb_token_paste" type="password" placeholder="Paste your Bearer token here…">
+          <div class="field-hint">Get this from ThingsBoard → Profile → Security, or via the login API</div>
+        </div>
+      </div>
+
+      <div class="error-inline" id="login-error" style="display:none">
+        <span class="ei-icon">⚠</span>
+        <span id="login-error-msg"></span>
+      </div>
+
+      <div class="demo-note" id="demo-note" style="display:none">
+        <strong>Demo credentials</strong><br>
+        Use <code>tenant@thingsboard.org</code> / <code>tenant</code> to explore sample data on ThingsBoard's live demo server.
+      </div>
+
+      <button class="btn-full primary" id="login-btn" onclick="doLogin()">
+        Sign In &amp; Continue →
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     SCREEN 2 — PICK DEVICE
+══════════════════════════════════════════════ -->
+<div id="screen-device" class="screen">
+  <div class="device-wrap">
+
+    <div class="step-indicator">
+      <div class="step-dot done" id="sdot-1b">
+        <div class="sdot">✓</div>&nbsp;Connected
+      </div>
+      <div class="step-line done"></div>
+      <div class="step-dot active">
+        <div class="sdot">2</div>&nbsp;Select Device
+      </div>
+      <div class="step-line" id="sline-2b"></div>
+      <div class="step-dot" id="sdot-3b">
+        <div class="sdot">3</div>&nbsp;Dashboard
+      </div>
+    </div>
+
+    <div class="connect-card">
+      <h2>Choose a Device</h2>
+      <p class="subtitle">Select the device whose data you want to explore. Your available devices are listed below.</p>
+
+      <div class="field-group">
+        <label>Select Device</label>
+        <select class="fi" id="device-select" onchange="onDeviceSelectChange()" style="cursor:pointer">
+          <option value="">Loading your devices…</option>
+        </select>
+        <div class="field-hint" id="device-hint"></div>
+      </div>
+
+      <div class="divider-or">or enter Device ID manually</div>
+      <div class="manual-id">
+        <input class="fi" id="manual_device_id" type="text" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+        <button class="btn-full secondary" style="width:auto;padding:10px 16px;white-space:nowrap"
+          onclick="useManualId()">Use this ID</button>
+      </div>
+
+      <div class="field-group">
+        <label>Time Period to Analyse</label>
+        <select class="fi" id="time-select" onchange="onTimeSelectChange(this.value)" style="cursor:pointer">
+          {% for k,v in time_ranges.items() %}
+          <option value="{{ k }}" {% if k=='24h' %}selected{% endif %}>{{ v[0] }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="error-inline" id="device-error" style="display:none">
+        <span class="ei-icon">⚠</span>
+        <span id="device-error-msg"></span>
+      </div>
+
+      <div style="display:flex;gap:10px">
+        <button class="btn-full secondary" style="max-width:120px" onclick="goBack()">← Back</button>
+        <button class="btn-full primary" id="generate-btn" onclick="generateDashboard()">
+          Generate Dashboard →
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     SCREEN 3 — DASHBOARD
+══════════════════════════════════════════════ -->
+<div id="screen-dashboard" class="screen">
+  <div class="dash-layout">
+
+    <aside class="dash-sidebar">
+
+      <div>
+        <div class="ds-label">Device</div>
+        <div class="device-info-card">
+          <div class="dic-name" id="sid-name">—</div>
+          <div class="dic-type" id="sid-type"></div>
+          <div class="dic-meta" id="sid-meta"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="ds-label">AI Pipeline</div>
+        <div class="pipeline-steps">
+          <div class="p-step" id="ps-DataFetcher">
+            <div class="p-dot"></div>
+            <div class="p-name">01 · Data Fetcher<br><span style="color:var(--gray-400);font-weight:400">Retrieves sensor data</span></div>
+            <span class="p-status">idle</span>
+          </div>
+          <div class="p-step" id="ps-DataCleaner">
+            <div class="p-dot"></div>
+            <div class="p-name">02 · Data Analyser<br><span style="color:var(--gray-400);font-weight:400">Finds patterns</span></div>
+            <span class="p-status">idle</span>
+          </div>
+          <div class="p-step" id="ps-VizRecommender">
+            <div class="p-dot"></div>
+            <div class="p-name">03 · AI Chart Picker<br><span style="color:var(--gray-400);font-weight:400">Selects best visuals</span></div>
+            <span class="p-status">idle</span>
+          </div>
+          <div class="p-step" id="ps-DashboardBuilder">
+            <div class="p-dot"></div>
+            <div class="p-name">04 · Dashboard Builder<br><span style="color:var(--gray-400);font-weight:400">Assembles view</span></div>
+            <span class="p-status">idle</span>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="ds-label">Activity Log</div>
+        <div class="agent-log" id="agent-log">
+          <span style="color:var(--gray-400)">Waiting to start…</span>
+        </div>
+      </div>
+
+      <div class="sidebar-actions">
+        <button class="sb-btn primary-sb" onclick="rerunDashboard()">↺ Refresh Data</button>
+        <button class="sb-btn" onclick="changeDevice()">⇄ Change Device</button>
+        <button class="sb-btn" onclick="logout()">→ Sign Out</button>
+      </div>
+
+    </aside>
+
+    <main class="dash-main" id="dash-main">
+      <div class="running-state">
+        <div class="running-glyph">◌</div>
+        <p>Your dashboard is being prepared…</p>
+        <p class="flow">Data Fetcher → Analyser → AI Chart Picker → Builder</p>
+      </div>
+    </main>
+
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const S = {
+    host: '', token: '',
+    userName: '{{ user_name }}',
+    deviceId: '', deviceName: '', timeRange: '24h',
+  };
+
+  const PRESET_URLS = {
+  {% for p in tb_presets %} '{{ p.key }}': '{{ p.url }}', {% endfor %}
+  };
+
+  let activeCharts = [];
+
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('screen-' + id).classList.add('active');
+  }
+
+  let currentPreset = 'cloud';
+  function onPresetChange(key) {
+    currentPreset = key;
+    const hostField = document.getElementById('host-field');
+    const demoNote = document.getElementById('demo-note');
+    const presetUrl = PRESET_URLS[key];
+    if (presetUrl) { S.host = presetUrl; hostField.style.display = 'none'; }
+    else { S.host = ''; hostField.style.display = ''; document.getElementById('tb_host_custom').focus(); }
+    demoNote.style.display = key === 'demo' ? '' : 'none';
+  }
+
+  let authMode = 'pass';
+  function switchTab(mode, el) {
+    authMode = mode;
+    document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('tab-pass').style.display = mode === 'pass' ? '' : 'none';
+    document.getElementById('tab-token').style.display = mode === 'token' ? '' : 'none';
+  }
+
+  async function doLogin() {
+    hideError('login-error');
+    const btn = document.getElementById('login-btn');
+    btn.disabled = true; btn.textContent = 'Signing in…';
+
+    const host = (currentPreset === 'self' || currentPreset === 'pe')
+      ? document.getElementById('tb_host_custom').value.trim()
+      : PRESET_URLS[currentPreset];
+
+    if (!host) { showError('login-error', 'Please enter your server address.'); btn.disabled = false; btn.textContent = 'Sign In & Continue →'; return; }
+    S.host = host;
+
+    const body = { tb_host: host };
+    if (authMode === 'pass') {
+      body.email = document.getElementById('tb_email').value.trim();
+      body.password = document.getElementById('tb_password').value;
+    } else {
+      body.token = document.getElementById('tb_token_paste').value.trim();
+    }
+
+    try {
+      const res = await post('/api/login', body);
+      const data = await res.json();
+      if (!res.ok) { showError('login-error', data.error || 'Login failed.'); return; }
+      S.token = data.token;
+      await loadDeviceScreen();
+    } catch (e) {
+      showError('login-error', 'Could not connect. Check your server address and internet connection.');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Sign In & Continue →';
+    }
+  }
+
+  async function loadDeviceScreen() {
+    showScreen('device');
+    const select = document.getElementById('device-select');
+    select.innerHTML = '<option value="">Loading your devices…</option>';
+    try {
+      const res = await post('/api/devices', { tb_host: S.host, token: S.token });
+      const data = await res.json();
+      renderDeviceList(data.devices || []);
+      if (data.warning) document.getElementById('device-hint').textContent += ' — ' + data.warning;
+    } catch (e) {
+      select.innerHTML = '<option value="">Could not load devices</option>';
+      document.getElementById('device-hint').textContent = 'Enter Device ID manually below.';
+    }
+  }
+
+  function renderDeviceList(devices) {
+    const select = document.getElementById('device-select');
+    const hint = document.getElementById('device-hint');
+    if (!devices.length) {
+      select.innerHTML = '<option value="">No devices found</option>';
+      hint.textContent = 'Enter a Device ID manually below or reload.';
+      return;
+    }
+    select.innerHTML = '<option value="">-- Choose a device --</option>';
+    devices.forEach(d => {
+      const o = document.createElement('option');
+      o.value = d.id; o.textContent = `${d.name} (${d.type || 'Device'})`;
+      o.dataset.name = d.name; select.appendChild(o);
+    });
+    hint.textContent = `${devices.length} device${devices.length !== 1 ? 's' : ''} available`;
+  }
+
+  function onDeviceSelectChange() {
+    const select = document.getElementById('device-select');
+    if (!select.value) { S.deviceId = ''; S.deviceName = ''; return; }
+    const o = select.options[select.selectedIndex];
+    S.deviceId = o.value; S.deviceName = o.dataset.name || o.textContent;
+  }
+
+  function useManualId() {
+    const v = document.getElementById('manual_device_id').value.trim();
+    if (!v) { showError('device-error', 'Please paste or type a Device ID.'); return; }
+    S.deviceId = v; S.deviceName = 'Device ' + v.slice(0, 8) + '…';
+    hideError('device-error');
+    document.getElementById('manual_device_id').style.borderColor = 'var(--black)';
+  }
+
+  function onTimeSelectChange(key) { S.timeRange = key; }
+  function goBack() { showScreen('connect'); }
+  function changeDevice() { loadDeviceScreen(); }
+
+  async function generateDashboard() {
+    if (!S.deviceId) { showError('device-error', 'Please select or enter a device.'); return; }
+    hideError('device-error');
+
+    document.getElementById('sid-name').textContent = S.deviceName;
+    document.getElementById('sid-type').textContent = '';
+    document.getElementById('sid-meta').textContent = '';
+
+    showScreen('dashboard');
+    resetPipeline(); destroyCharts(); clearLog();
+
+    document.getElementById('dash-main').innerHTML = `
+    <div class="running-state">
+      <div class="running-glyph">◌</div>
+      <p>Analysing your device data with AI…</p>
+      <p class="flow">Data Fetcher → Analyser → AI Chart Picker → Dashboard Builder</p>
+    </div>`;
+
+    setPipelineStatus('DataFetcher', 'running');
+
+    try {
+      const res = await post('/run', {
+        tb_host: S.host, tb_token: S.token,
+        device_id: S.deviceId, time_range: S.timeRange
+      });
+      const data = await res.json();
+      applyPipelineStatuses(data.agent_statuses || {});
+
+      if (data.session_id) {
+        try {
+          const lr = await fetch(`/logs/${data.session_id}`);
+          const logs = await lr.json();
+          clearLog();
+          logs.forEach(l => {
+            const t = new Date(l.created_at * 1000).toLocaleTimeString('en', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            appendLog(`<span class="le-time">[${t}]</span> <span class="le-agent">${esc(l.agent_name)}</span> — ${esc(l.message)}`);
+          });
+        } catch (e) {}
+      }
+
+      if (!res.ok || (!data.dashboard_data && data.error)) {
+        document.getElementById('dash-main').innerHTML =
+          `<div class="notice error"><span class="n-icon">⚠</span><div><strong>Error</strong>${esc(data.error || 'Something went wrong.')}</div></div>`;
+        return;
+      }
+
+      const d = data.dashboard_data;
+      document.getElementById('sid-name').textContent = d.device_name || S.deviceName;
+      document.getElementById('sid-type').textContent = d.device_type || '';
+      document.getElementById('sid-meta').innerHTML =
+        `Time: ${esc(d.time_range_label)}<br>` +
+        `Sensors: ${d.numeric_count} numeric · ${d.boolean_count} on/off · ${d.string_count} text<br>` +
+        `Points: ${(d.total_points || 0).toLocaleString()}`;
+
+      renderDashboard(data.dashboard_data, data.errors || [], data.warnings || []);
+    } catch (e) {
+      document.getElementById('dash-main').innerHTML =
+        `<div class="notice error"><span class="n-icon">⚠</span><div><strong>Connection Error</strong>${esc(e.message)}</div></div>`;
+    }
+  }
+
+  async function rerunDashboard() {
+    if (!S.deviceId || !S.token) return;
+    await generateDashboard();
+  }
+
+  function resetPipeline() {
+    ['DataFetcher', 'DataCleaner', 'VizRecommender', 'DashboardBuilder'].forEach(n => {
+      const el = document.getElementById(`ps-${n}`);
+      if (!el) return;
+      el.className = 'p-step';
+      el.querySelector('.p-status').textContent = 'idle';
+    });
+  }
+
+  function setPipelineStatus(name, status) {
+    const el = document.getElementById(`ps-${name}`);
+    if (!el) return;
+    el.className = `p-step ${status}`;
+    el.querySelector('.p-status').textContent =
+      status === 'pending' ? 'queued' : status === 'done' ? 'done' : status === 'error' ? 'error' : status;
+  }
+
+  function applyPipelineStatuses(statuses) {
+    Object.entries(statuses).forEach(([n, s]) => setPipelineStatus(n, s));
+  }
+
+  function appendLog(html) {
+    const box = document.getElementById('agent-log');
+    box.innerHTML += `<div class="log-entry">${html}</div>`;
+    box.scrollTop = box.scrollHeight;
+  }
+
+  function clearLog() { document.getElementById('agent-log').innerHTML = ''; }
+
+  function renderDashboard(d, errors, warnings) {
+    let html = '';
+    const fa = new Date(d.fetched_at).toLocaleString();
+
+    html += `
+    <div class="dash-hdr">
+      <div>
+        <div class="dh-title">${esc(d.device_name)}</div>
+        <div class="dh-meta">
+          ${d.device_type ? 'Type: ' + esc(d.device_type) + ' &nbsp;·&nbsp;' : ''}
+          Last updated: ${fa}
+        </div>
+      </div>
+      <div class="dh-badges">
+        <span class="badge fill">${esc(d.time_range_label)}</span>
+        ${d.numeric_count ? `<span class="badge">${d.numeric_count} sensors</span>` : ''}
+        ${d.boolean_count ? `<span class="badge">${d.boolean_count} on/off</span>` : ''}
+        ${d.string_count ? `<span class="badge">${d.string_count} text</span>` : ''}
+      </div>
+    </div>`;
+
+    errors.forEach(e => html += `<div class="notice error"><span class="n-icon">⚠</span><div><strong>Warning</strong>${esc(e)}</div></div>`);
+    warnings.forEach(w => html += `<div class="notice"><span class="n-icon">ℹ</span><div><strong>Note</strong>${esc(w)}</div></div>`);
+
+    html += `
+    <div class="summary-strip">
+      <div class="sum-cell"><div class="sum-num">${d.total_tele_keys}</div><div class="sum-lbl">Data Streams</div></div>
+      <div class="sum-cell"><div class="sum-num">${d.total_attr_keys}</div><div class="sum-lbl">Device Settings</div></div>
+      <div class="sum-cell"><div class="sum-num">${(d.total_points || 0).toLocaleString()}</div><div class="sum-lbl">Data Points</div></div>
+      <div class="sum-cell"><div class="sum-num">${(d.patterns || []).length}</div><div class="sum-lbl">Insights Found</div></div>
+    </div>`;
+
+    if (d.kpi_cards?.length) {
+      html += `<div class="sec-hdr"><span class="sec-title">Sensor Readings</span><span class="sec-count">${d.kpi_cards.length} sensors</span></div>`;
+      html += '<div class="kpi-grid">';
+      d.kpi_cards.forEach(k => {
+        const tc = k.trend === 'rising' ? 'rising' : k.trend === 'falling' ? 'falling' : '';
+        const ts = k.trend === 'rising' ? '↑ rising' : k.trend === 'falling' ? '↓ falling' : '→ stable';
+        html += `
+        <div class="kpi-card">
+          <div class="kc-label">${esc(k.label)}</div>
+          <div class="kc-val">${fmtNum(k.avg)}<span class="kc-unit">${k.unit ? ' ' + esc(k.unit) : ''}</span></div>
+          <div class="kc-range"><span>Min ${fmtNum(k.min)}</span><span>Max ${fmtNum(k.max)}</span></div>
+          <div class="kc-footer">
+            <span class="tag ${tc}">${ts}</span>
+            ${k.anomaly_count > 0 ? `<span class="tag warn">${k.anomaly_count} anomalies</span>` : ''}
+          </div>
+        </div>`;
+      });
+      html += '</div>';
+    }
+
+    if (d.bool_cards?.length) {
+      html += `<div class="sec-hdr"><span class="sec-title">On / Off Status</span><span class="sec-count">${d.bool_cards.length} sensors</span></div>`;
+      html += '<div class="bool-grid">';
+      d.bool_cards.forEach(b => {
+        const on = b.last_value;
+        html += `
+        <div class="bool-card">
+          <div class="bc-label">${esc(b.label)}</div>
+          <div class="bc-status">
+            <div class="bc-dot ${on ? 'on' : 'off'}"></div>
+            <div class="bc-state">${on ? 'Currently ON' : 'Currently OFF'}</div>
+          </div>
+          <div class="bc-bar"><div class="bc-fill" style="width:${b.true_pct}%"></div></div>
+          <div class="bc-pcts"><span>ON ${b.true_pct}% of the time</span><span>OFF ${100 - b.true_pct}%</span></div>
+        </div>`;
+      });
+      html += '</div>';
+    }
+
+    if (d.string_cards?.length) {
+      html += `<div class="sec-hdr"><span class="sec-title">Data &amp; States</span><span class="sec-count">${d.string_cards.length} sensors</span></div>`;
+      html += '<div class="str-grid">';
+      d.string_cards.forEach(sc => {
+        const maxC = sc.top.length ? Math.max(...sc.top.map(x => x.c)) : 1;
+        html += `
+        <div class="str-card">
+          <div class="sc-label">${esc(sc.label)}</div>
+          <div class="sc-latest">Latest: ${esc(sc.latest)}</div>
+          ${sc.top.map(t => `
+            <div class="sc-bar-row">
+              <span class="sc-val" title="${esc(t.v)}">${esc(t.v)}</span>
+              <div class="sc-bar-bg"><div class="sc-bar-fill" style="width:${Math.round(t.c / maxC * 100)}%"></div></div>
+              <span class="sc-cnt">${t.c}</span>
+            </div>`).join('')}
+          <div style="font-family:var(--mono);font-size:10px;color:var(--gray-400);margin-top:6px">${sc.unique} unique values · ${sc.total} records</div>
+        </div>`;
+      });
+      html += '</div>';
+    }
+
+    const charts = d.chart_blocks || [];
+    const kpiBlocks = charts.filter(c => c.render_type === 'kpi_single');
+    const boolBlocks = charts.filter(c => c.render_type === 'boolean_status');
+    const chartBlocks = charts.filter(c => c.render_type === 'chartjs');
+
+    if (kpiBlocks.length || boolBlocks.length) {
+      html += `<div class="sec-hdr"><span class="sec-title">AI-Selected Highlights</span><span class="sec-count">${kpiBlocks.length + boolBlocks.length} cards</span></div>`;
+      html += '<div class="highlight-grid">';
+      kpiBlocks.forEach(b => {
+        const tc = b.trend === 'rising' ? 'rising' : b.trend === 'falling' ? 'falling' : '';
+        const ts = b.trend === 'rising' ? '↑ rising' : b.trend === 'falling' ? '↓ falling' : '→ stable';
+        html += `
+        <div class="hl-kpi">
+          <div class="hk-label">${esc(b.title)}</div>
+          <div class="hk-val">${fmtNum(b.value)}<span class="hk-unit">${b.unit ? ' ' + esc(b.unit) : ''}</span></div>
+          <span class="tag ${tc}">${ts}</span>
+          <div class="hk-desc">${esc(b.desc)}</div>
+        </div>`;
+      });
+      boolBlocks.forEach(b => {
+        const on = b.last_value;
+        html += `
+        <div class="hl-bool">
+          <div class="hb-label">${esc(b.title)}</div>
+          <div class="hb-state"><div class="hb-dot ${on ? 'on' : 'off'}"></div><div class="hb-text">${on ? 'ON' : 'OFF'}</div></div>
+          <div class="hb-bar"><div class="hb-fill" style="width:${b.true_pct}%"></div></div>
+          <div class="hb-pcts"><span>${b.true_pct}% on</span><span>${b.false_pct}% off</span></div>
+          <div class="hb-desc">${esc(b.desc)}</div>
+        </div>`;
+      });
+      html += '</div>';
+    }
+
+    if (chartBlocks.length) {
+      html += `<div class="sec-hdr"><span class="sec-title">AI-Recommended Charts</span><span class="sec-count">${chartBlocks.length} charts</span></div>`;
+      html += '<div class="chart-grid">';
+      chartBlocks.forEach(c => {
+        html += `
+        <div class="chart-cell">
+          <div class="cc-hdr">
+            <div>
+              <div class="cc-title">${esc(c.title)}</div>
+              <div class="cc-desc">${esc(c.desc || '')}</div>
+            </div>
+            <span class="cc-type">${esc(c.chart_type)}</span>
+          </div>
+          <div class="chart-wrap"><canvas id="cv-${c.id}"></canvas></div>
+        </div>`;
+      });
+      html += '</div>';
+    }
+
+    if (d.patterns?.length) {
+      html += `
+      <div class="patterns-box">
+        <div class="pb-hdr">
+          <span class="pb-title">AI Insights &amp; Patterns</span>
+          <span style="font-size:10px;color:var(--gray-400)">${d.patterns.length} found</span>
+        </div>
+        <div class="pb-body">
+          ${d.patterns.map(p => `
+            <div class="pat-row">
+              <span class="pat-badge ${p.severity === 'warning' ? 'warning' : ''}">${esc(p.type)}</span>
+              <span class="pat-text">${esc(p.description)}</span>
+            </div>`).join('')}
+        </div>
+      </div>`;
+    }
+
+    if (d.attr_table?.length) {
+      html += `
+      <div class="attr-box">
+        <div class="ab-hdr">
+          <span class="ab-title">Device Settings &amp; Info</span>
+          <span style="font-size:10px;color:var(--gray-400)">${d.attr_table.length} entries</span>
+        </div>
+        <table class="attr-table">
+          <thead><tr><th>Setting</th><th>Value</th><th>Source</th></tr></thead>
+          <tbody>
+            ${d.attr_table.slice(0, 30).map(a => `
+              <tr>
+                <td>${esc(a.label || a.key)}</td>
+                <td>${esc(a.value)}</td>
+                <td><span class="scope-tag">${esc(a.scope)}</span></td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+    }
+
+    document.getElementById('dash-main').innerHTML = html;
+    chartBlocks.forEach(c => {
+      try {
+        const canvas = document.getElementById(`cv-${c.id}`);
+        if (!canvas || !c.config) return;
+        activeCharts.push(new Chart(canvas, c.config));
+      } catch (e) { console.warn('Chart render failed:', c.id, e); }
+    });
+  }
+
+  function fmtNum(n) {
+    if (n === undefined || n === null) return '—';
+    if (Math.abs(n) >= 100000) return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+    if (Math.abs(n) < 0.001 && n !== 0) return n.toExponential(2);
+    return parseFloat(n.toPrecision(5)).toString();
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function showError(id, msg) {
+    document.getElementById(id).style.display = '';
+    document.getElementById(id + '-msg').textContent = msg;
+  }
+
+  function hideError(id) { document.getElementById(id).style.display = 'none'; }
+
+  function destroyCharts() {
+    activeCharts.forEach(c => { try { c.destroy() } catch (e) {} });
+    activeCharts = [];
+  }
+
+  async function post(url, body) {
+    return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  }
+
+  function logout() {
+    S.token = ''; S.userName = ''; S.deviceId = ''; S.host = '';
+    document.getElementById('tb_email').value = '';
+    document.getElementById('tb_password').value = '';
+    document.getElementById('tb_token_paste').value = '';
+    showScreen('connect');
+  }
+</script>
+{% endblock %}

@@ -12,6 +12,11 @@ def get_db():
 def init_db():
     c = get_db()
     c.executescript("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE,
+            password_hash TEXT
+        );
         CREATE TABLE IF NOT EXISTS sessions (
             id TEXT PRIMARY KEY, created_at REAL,
             tb_host TEXT, device_id TEXT, time_range TEXT
@@ -33,3 +38,27 @@ def log_agent(sid, name, status, msg):
     )
     c.commit()
     c.close()
+
+def create_user(email, password_hash):
+    c = get_db()
+    try:
+        c.execute("INSERT INTO users (email, password_hash) VALUES (?, ?)",
+                  (email, password_hash))
+        c.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False
+    finally:
+        c.close()
+
+def get_user_by_email(email):
+    c = get_db()
+    user = c.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+    c.close()
+    return user
+
+def get_user_by_id(user_id):
+    c = get_db()
+    user = c.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+    c.close()
+    return user

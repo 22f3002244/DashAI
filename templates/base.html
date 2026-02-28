@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Dash AI{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --black: #111111;
+            --white: #ffffff;
+            --off-white: #f9f9f9;
+            --gray-100: #f4f4f4;
+            --gray-200: #e8e8e8;
+            --gray-300: #d0d0d0;
+            --gray-400: #a0a0a0;
+            --gray-500: #6b6b6b;
+            --gray-600: #3d3d3d;
+
+            --font: 'Sora', sans-serif;
+            --mono: 'JetBrains Mono', monospace;
+
+            --radius-sm: 8px;
+            --radius: 14px;
+            --radius-lg: 18px;
+            --radius-pill: 100px;
+
+            --shadow-sm: 0 1px 4px rgba(0,0,0,.05);
+            --shadow: 0 4px 20px rgba(0,0,0,.07);
+            --shadow-lg: 0 12px 40px rgba(0,0,0,.09);
+
+            --border: 1px solid var(--gray-200);
+
+            /* legacy aliases */
+            --blue: #1a56db;
+            --blue-dark: #1240aa;
+            --error: #c0392b;
+            --success: #16a34a;
+            --primary: var(--black);
+            --primary-hover: var(--gray-600);
+            --b: var(--black);
+            --w: var(--white);
+            --mono-font: var(--mono);
+            --border-color: var(--gray-200);
+            --g1: var(--gray-100);
+            --g2: var(--gray-200);
+            --g3: var(--gray-300);
+            --g4: var(--gray-400);
+            --g5: var(--gray-500);
+            --g6: var(--gray-600);
+            --g7: var(--black);
+        }
+
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font);
+            background: var(--white);
+            color: var(--black);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        a {
+            color: inherit;
+            text-decoration: none;
+            transition: opacity 0.15s;
+        }
+
+        a:hover { opacity: 0.65; }
+
+        /* ── Topbar ── */
+        .topbar {
+            background: rgba(255,255,255,0.92);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-bottom: var(--border);
+            padding: 0 40px;
+            height: 62px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--black);
+            letter-spacing: -0.03em;
+        }
+
+        .brand:hover { opacity: 1; }
+
+        .brand-icon {
+            width: 30px;
+            height: 30px;
+            background: var(--black);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .brand-icon svg { width: 15px; height: 15px; stroke: white; }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* ── Buttons ── */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 9px 22px;
+            border-radius: var(--radius-pill);
+            font-weight: 600;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.18s ease;
+            border: 1.5px solid transparent;
+            font-family: var(--font);
+            line-height: 1;
+            white-space: nowrap;
+            letter-spacing: -0.01em;
+        }
+
+        .btn-primary {
+            background: var(--black);
+            color: var(--white);
+            border-color: var(--black);
+        }
+
+        .btn-primary:hover {
+            background: var(--gray-600);
+            border-color: var(--gray-600);
+            color: var(--white);
+            opacity: 1;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(0,0,0,.18);
+        }
+
+        .btn-outline {
+            background: transparent;
+            border-color: var(--gray-200);
+            color: var(--black);
+        }
+
+        .btn-outline:hover {
+            background: var(--gray-100);
+            border-color: var(--gray-300);
+            opacity: 1;
+            color: var(--black);
+        }
+
+        .btn-text {
+            background: transparent;
+            color: var(--gray-500);
+            border-color: transparent;
+            padding: 9px 14px;
+        }
+
+        .btn-text:hover {
+            color: var(--black);
+            background: var(--gray-100);
+            opacity: 1;
+        }
+
+        .user-menu {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.8125rem;
+            color: var(--gray-500);
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ── Cards ── */
+        .card {
+            background: var(--white);
+            border: var(--border);
+            border-radius: var(--radius-lg);
+            padding: 32px;
+            box-shadow: var(--shadow);
+        }
+
+        /* ── Form Inputs ── */
+        .input-group {
+            margin-bottom: 14px;
+            text-align: left;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+            color: var(--gray-600);
+            font-size: 0.8rem;
+        }
+
+        .input-group input,
+        .input-group select {
+            width: 100%;
+            padding: 11px 16px;
+            border: 1.5px solid var(--gray-200);
+            border-radius: var(--radius-sm);
+            font-family: var(--font);
+            font-size: 0.9375rem;
+            color: var(--black);
+            background: var(--white);
+            transition: all 0.15s;
+            outline: none;
+        }
+
+        .input-group input:hover,
+        .input-group select:hover { border-color: var(--gray-300); }
+
+        .input-group input:focus,
+        .input-group select:focus {
+            border-color: var(--black);
+            box-shadow: 0 0 0 3px rgba(17,17,17,.06);
+        }
+
+        .error-message {
+            background: #fef2f2;
+            color: #b91c1c;
+            border: 1px solid #fecaca;
+            padding: 12px 16px;
+            border-radius: var(--radius-sm);
+            margin-bottom: 16px;
+            font-size: 0.8125rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+
+<body>
+    <header class="topbar">
+        <a href="/" class="brand">Dash AI</a>
+
+        <div class="nav-links">
+            {% if session.get('user_id') %}
+            <div class="user-menu">
+                <span>{{ user_name if user_name else 'User' }}</span>
+                <a href="{{ url_for('main.logout') }}" class="btn btn-text">Sign out</a>
+            </div>
+            {% else %}
+            <a href="{{ url_for('main.login') }}" class="btn btn-text">Sign in</a>
+            <a href="{{ url_for('main.register') }}" class="btn btn-primary">Get started →</a>
+            {% endif %}
+        </div>
+    </header>
+
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

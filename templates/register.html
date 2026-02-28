@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+
+{% block title %}Create Account | Dash AI{% endblock %}
+
+{% block extra_css %}
+<style>
+    .auth-page {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: calc(100vh - 62px);
+        padding: 48px 24px;
+        background: var(--off-white);
+    }
+
+    .auth-wrap {
+        width: 100%;
+        max-width: 420px;
+    }
+
+    .auth-card {
+        background: var(--white);
+        border: var(--border);
+        border-radius: var(--radius-lg);
+        padding: 44px 40px;
+        box-shadow: var(--shadow);
+        text-align: center;
+    }
+
+    .auth-icon {
+        width: 44px;
+        height: 44px;
+        background: var(--black);
+        border-radius: var(--radius-sm);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 20px;
+    }
+
+    .auth-icon svg {
+        width: 20px;
+        height: 20px;
+        stroke: white;
+    }
+
+    .auth-card h2 {
+        font-size: 1.625rem;
+        font-weight: 800;
+        letter-spacing: -0.04em;
+        color: var(--black);
+        margin-bottom: 6px;
+    }
+
+    .auth-card .auth-sub {
+        font-size: 0.875rem;
+        color: var(--gray-400);
+        margin-bottom: 28px;
+    }
+
+    .perks-list {
+        background: var(--gray-100);
+        border-radius: var(--radius-sm);
+        padding: 16px 20px;
+        margin-bottom: 24px;
+        text-align: left;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .perk-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 0.8125rem;
+        color: var(--gray-600);
+    }
+
+    .perk-check {
+        width: 18px;
+        height: 18px;
+        background: var(--black);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .perk-check svg {
+        width: 10px;
+        height: 10px;
+        stroke: white;
+    }
+
+    .input-group {
+        margin-bottom: 12px;
+        text-align: left;
+    }
+
+    .input-group input {
+        width: 100%;
+        padding: 12px 16px;
+        border: 1.5px solid var(--gray-200);
+        border-radius: var(--radius-sm);
+        font-family: var(--font);
+        font-size: 0.9375rem;
+        color: var(--black);
+        background: var(--white);
+        transition: all 0.15s;
+        outline: none;
+    }
+
+    .input-group input::placeholder { color: var(--gray-400); }
+    .input-group input:focus {
+        border-color: var(--black);
+        box-shadow: 0 0 0 3px rgba(17,17,17,.06);
+    }
+
+    .btn-submit {
+        width: 100%;
+        padding: 13px;
+        background: var(--black);
+        color: var(--white);
+        border: none;
+        border-radius: var(--radius-pill);
+        font-family: var(--font);
+        font-size: 0.9375rem;
+        font-weight: 700;
+        cursor: pointer;
+        margin-top: 8px;
+        transition: all 0.18s;
+        letter-spacing: -0.01em;
+    }
+
+    .btn-submit:hover {
+        background: var(--gray-600);
+        transform: translateY(-1px);
+        box-shadow: 0 6px 20px rgba(0,0,0,.18);
+    }
+
+    .auth-footer {
+        margin-top: 24px;
+        font-size: 0.8125rem;
+        color: var(--gray-400);
+    }
+
+    .auth-footer a {
+        color: var(--black);
+        font-weight: 600;
+    }
+
+    .auth-footer a:hover { opacity: 0.6; }
+
+    .error-message {
+        background: #fef2f2;
+        color: #b91c1c;
+        border: 1px solid #fecaca;
+        padding: 12px 16px;
+        border-radius: var(--radius-sm);
+        margin-bottom: 16px;
+        font-size: 0.8125rem;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        text-align: left;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+    <div class="auth-wrap">
+        <div class="auth-card">
+            
+            <h2>Create your account</h2> <br>
+
+            {% if error %}
+            <div class="error-message">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                {{ error }}
+            </div>
+            {% endif %}
+
+            <form method="POST" action="{{ url_for('main.register') }}">
+                <div class="input-group">
+                    <input type="email" name="email" required placeholder="Email address" autocomplete="email">
+                </div>
+                <div class="input-group">
+                    <input type="password" name="password" required placeholder="Create a password" autocomplete="new-password">
+                </div>
+                <button type="submit" class="btn-submit">Create account</button>
+            </form>
+
+            <div class="auth-footer">
+                Already have an account? <a href="{{ url_for('main.login') }}">Sign in</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
