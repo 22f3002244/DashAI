@@ -1,18 +1,20 @@
-# ThingsBoard AI Dashboard
+# Dash AI
 
-An AI-powered IoT dashboard that connects to any ThingsBoard server, fetches your device data, and automatically generates charts and insights using a 4-agent pipeline.
+An AI-powered IoT analytics platform that connects to your ThingsBoard instance. Dash AI instantly fetches your device data and automatically generates beautiful, actionable insights using a 4-agent LLM pipeline.
 
 ## Features
 
-- **Zero-config login** — email + password or paste a JWT token
-- **Device picker** — select from a dropdown, no UUID copy-pasting
-- **4-agent pipeline** (LangGraph-style):
-  1. **DataFetcher** — authenticates and fetches telemetry & attributes
-  2. **DataCleaner** — classifies, cleans, computes stats, finds patterns
-  3. **VizRecommender** — Groq AI selects the best visualisations
-  4. **DashboardBuilder** — assembles the final dashboard
-- **Fallback mode** — smart default charts if Groq is unavailable
-- **Groq key is server-side only** — never exposed to the browser
+- **Google-like AI Native UI** — Modern, clean design with landing and auth pages
+- **Zero-config Connect** — Sign in with email + password or paste a JWT token
+- **Smart Device Picker** — Select from an interactive dropdown
+- **4-agent AI Pipeline**:
+  1. **DataFetcher** — Authenticates and retrieves telemetry & attributes
+  2. **DataCleaner** — Cleans, computes stats, and finds patterns in IoT data
+  3. **VizRecommender** — AI curates the best charts and visualization methods
+  4. **DashboardBuilder** — Assembles the final Dash AI view
+- **Fallback Mode** — Smart default charts if AI generation is unavailable
+- **Secure by Design** — AI API keys are handled server-side
+- **User Authentication** — Local SQLite-based user registry to save your setup
 
 ## Project Structure
 
@@ -20,16 +22,20 @@ An AI-powered IoT dashboard that connects to any ThingsBoard server, fetches you
 25th TB/
 ├── app.py                  # Entry point — Flask app + run
 ├── config.py               # Env loading, API keys, constants
-├── database.py             # SQLite helpers (sessions, agent_logs)
+├── database.py             # SQLite helpers (users, sessions, agent_logs)
 ├── pipeline.py             # AgentState + run_pipeline orchestrator
 ├── routes.py               # Flask Blueprint (all HTTP endpoints)
 ├── agents/
 │   ├── data_fetcher.py     # Agent 1 — ThingsBoard API client
 │   ├── data_cleaner.py     # Agent 2 — data analysis & pattern detection
-│   ├── viz_recommender.py  # Agent 3 — Groq AI chart selection
+│   ├── viz_recommender.py  # Agent 3 — AI chart selection
 │   └── dashboard_builder.py# Agent 4 — chart.js config builder
 ├── templates/
-│   └── index.html          # Single-page UI (CSS + HTML + JS)
+│   ├── base.html           # Main UI shell (CSS, fonts, topbar)
+│   ├── landing.html        # Public homepage
+│   ├── login.html          # User sign in page
+│   ├── register.html       # User signup page
+│   └── dashboard.html      # Main app / Connect / Visualization views
 ├── .env                    # Secrets — NOT committed to git
 ├── .gitignore
 └── requirements.txt
