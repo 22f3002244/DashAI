@@ -88,7 +88,9 @@
         border-right: var(--border);
     }
 
-    .stat-item:last-child { border-right: none; }
+    .stat-item:last-child {
+        border-right: none;
+    }
 
     .stat-num {
         font-size: 2.25rem;
@@ -229,7 +231,69 @@
         color: var(--white);
         opacity: 1;
         transform: translateY(-2px);
-        box-shadow: 0 8px 24px rgba(0,0,0,.18);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, .18);
+    }
+
+    /* ── Mobile Responsive ── */
+    @media (max-width: 768px) {
+        .hero {
+            padding: 80px 20px 60px;
+        }
+
+        .hero h1 {
+            font-size: 3rem;
+            line-height: 1.1;
+        }
+
+        .hero p {
+            font-size: 1rem;
+            margin-bottom: 32px;
+        }
+
+        .hero-cta {
+            flex-direction: column;
+            width: 100%;
+            max-width: 320px;
+            margin: 0 auto;
+        }
+
+        .btn-hero {
+            width: 100%;
+        }
+
+        .stats-section {
+            padding: 40px 20px;
+        }
+
+        .stats-inner {
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .stat-item {
+            border-right: none;
+            border-bottom: var(--border);
+            padding-bottom: 24px;
+            max-width: 100%;
+        }
+
+        .stat-item:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .features-section {
+            padding: 60px 20px;
+        }
+
+        .features-grid {
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+
+        .cta-section h2 {
+            font-size: 2.25rem;
+        }
     }
 </style>
 {% endblock %}
@@ -240,7 +304,8 @@
     <div class="hero">
         <div class="hero-tag"><span class="hero-tag-dot"></span> AI-powered IoT analytics</div>
         <h1>AI native IoT<br>dashboard</h1>
-        <p>Connect your ThingsBoard devices and let AI build clear, actionable dashboards in seconds. No configuration required.</p>
+        <p>Connect your ThingsBoard devices and let AI build clear, actionable dashboards in seconds. No configuration
+            required.</p>
         <div class="hero-cta">
             <a href="{{ url_for('main.register') }}" class="btn btn-primary btn-hero">Try a free demo &nbsp;›</a>
             <a href="{{ url_for('main.login') }}" class="btn btn-outline btn-hero">Sign in</a>
@@ -286,7 +351,8 @@
                 </svg>
             </div>
             <h3>Real-time insights</h3>
-            <p>Analyze data from any connected device instantly. Automated pattern recognition identifies trends and anomalies as they happen.</p>
+            <p>Analyze data from any connected device instantly. Automated pattern recognition identifies trends and
+                anomalies as they happen.</p>
         </div>
         <div class="feature-card">
             <div class="feature-icon-wrap">
@@ -296,7 +362,8 @@
                 </svg>
             </div>
             <h3>AI-generated dashboards</h3>
-            <p>Stop manually configuring charts. Our AI automatically selects and builds the best visualizations for your specific datasets.</p>
+            <p>Stop manually configuring charts. Our AI automatically selects and builds the best visualizations for
+                your specific datasets.</p>
         </div>
         <div class="feature-card">
             <div class="feature-icon-wrap">
@@ -306,7 +373,8 @@
                 </svg>
             </div>
             <h3>Private by design</h3>
-            <p>Your data belongs to you. We process information securely without storing your tokens or device data on our servers.</p>
+            <p>Your data belongs to you. We process information securely without storing your tokens or device data on
+                our servers.</p>
         </div>
         <div class="feature-card">
             <div class="feature-icon-wrap">
@@ -315,7 +383,8 @@
                 </svg>
             </div>
             <h3>Lower operational costs by 30%</h3>
-            <p>Manage all your IoT monitoring needs on one platform. No more cost and pain of juggling multiple analytics tools.</p>
+            <p>Manage all your IoT monitoring needs on one platform. No more cost and pain of juggling multiple
+                analytics tools.</p>
         </div>
         <div class="feature-card">
             <div class="feature-icon-wrap">
@@ -324,18 +393,22 @@
                 </svg>
             </div>
             <h3>24×7 support access</h3>
-            <p>Our customer-first approach ensures you never get stuck. Access priority support that keeps your operations running.</p>
+            <p>Our customer-first approach ensures you never get stuck. Access priority support that keeps your
+                operations running.</p>
         </div>
         <div class="feature-card">
             <div class="feature-icon-wrap">
                 <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="12" cy="12" r="10"></circle>
                     <line x1="2" y1="12" x2="22" y2="12"></line>
-                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                    <path
+                        d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z">
+                    </path>
                 </svg>
             </div>
             <h3>From startups to enterprises</h3>
-            <p>Whether you're a fast-scaling startup or a multi-country enterprise, Dash AI adapts to any operational complexity.</p>
+            <p>Whether you're a fast-scaling startup or a multi-country enterprise, Dash AI adapts to any operational
+                complexity.</p>
         </div>
     </div>
 </section>

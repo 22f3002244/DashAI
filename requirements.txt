@@ -3,6 +3,7 @@
 
 flask>=3.0.0
 requests>=2.31.0
+psycopg2-binary>=2.9.9
 
 # Optional: ThingsBoard Python REST client (for advanced use)
 # tb-rest-client>=3.5.0
