@@ -1,8 +1,8 @@
 from datetime import datetime
 from database import log_agent
 from agents.data_cleaner import _pretty
-
-COLORS = ["#000","#333","#555","#777","#999","#222","#444","#666"]
+# A vibrant qualitative color palette
+COLORS = ["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#14b8a6", "#f43f5e", "#6366f1"]
 
 def _build_chartjs(chart_type, keys, cd):
     num   = cd.get("numeric", {})
@@ -38,7 +38,7 @@ def _build_chartjs(chart_type, keys, cd):
         if key and key in bool_:
             b = bool_[key]; tc = sum(1 for e in b["events"] if e["value"]); fc = len(b["events"])-tc
             return {"type":"doughnut","data":{"labels":["ON","OFF"],
-                "datasets":[{"data":[tc,fc],"backgroundColor":["#000","#eee"],"borderWidth":0}]},
+                "datasets":[{"data":[tc,fc],"backgroundColor":["#10b981","#e5e7eb"],"borderWidth":0}]},
                 "options":{"responsive":True,"maintainAspectRatio":False,"cutout":"65%",
                 "plugins":{"legend":{"position":"bottom","labels":{"color":"#000","font":{"size":11}}}}}}
         if key and key in str_:
@@ -62,8 +62,8 @@ def _build_chartjs(chart_type, keys, cd):
         if len(sk2) < 3: return None
         return {"type": chart_type, "data": {"labels": sk2, "datasets": [{
             "label": "Normalised (0-100%)", "data": sv,
-            "backgroundColor": "#00000015", "borderColor": "#000", "borderWidth": 1.5,
-            "pointBackgroundColor": "#000", "pointRadius": 3}]},
+            "backgroundColor": "#3b82f633", "borderColor": "#3b82f6", "borderWidth": 2,
+            "pointBackgroundColor": "#3b82f6", "pointRadius": 3}]},
             "options": {"responsive": True, "maintainAspectRatio": False,
             "plugins": {"legend": {"display": False}},
             "scales": {"r": {"ticks": {"color":"#ccc","font":{"size":10}}, "grid": {"color":"#f0f0f0"}}}}}
@@ -139,7 +139,7 @@ def agent_dashboard_builder(state):
                     if top:
                         ls2, vs2 = zip(*top)
                         cfg = {"type":"bar","data":{"labels":list(ls2),
-                            "datasets":[{"label":"Count","data":list(vs2),"backgroundColor":"#000","borderWidth":0}]},
+                            "datasets":[{"label":"Count","data":list(vs2),"backgroundColor":COLORS[0],"borderWidth":0}]},
                             "options":{"responsive":True,"maintainAspectRatio":False,"indexAxis":"y",
                             "plugins":{"legend":{"display":False}},
                             "scales":{"x":{"ticks":{"color":"#bbb","font":{"size":10}},"grid":{"color":"#f5f5f5"}},
