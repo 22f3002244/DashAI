@@ -2,7 +2,7 @@ import hashlib
 import time
 from typing import TypedDict, List, Dict, Optional
 
-from database import get_db, log_agent
+from database import get_db, log_agent, save_session
 from agents.data_fetcher import agent_data_fetcher
 from agents.data_cleaner import agent_data_cleaner
 from agents.viz_recommender import agent_viz_recommender
@@ -26,10 +26,7 @@ class AgentState(TypedDict, total=False):
 
 def run_pipeline(tb_host, tb_token, device_id, time_range) -> AgentState:
     sid = hashlib.md5(f"{tb_token}{device_id}{time.time()}".encode()).hexdigest()[:12]
-    c = get_db()
-    c.execute("INSERT OR REPLACE INTO sessions VALUES (?,?,?,?,?)",
-              (sid, time.time(), tb_host, device_id, time_range))
-    c.commit(); c.close()
+    save_session(sid, time.time(), tb_host, device_id, time_range)
 
     state: AgentState = {
         "session_id": sid, "tb_host": tb_host, "tb_token": tb_token,

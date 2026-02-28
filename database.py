@@ -113,3 +113,38 @@ def get_user_by_id(user_id):
     cur.close()
     conn.close()
     return user
+
+def save_session(sid, created_at, host, device_id, time_range):
+    conn = get_db()
+    cur = conn.cursor()
+    if DATABASE_URL:
+        # PostgreSQL: Use ON CONFLICT
+        cur.execute("""
+            INSERT INTO sessions (id, created_at, tb_host, device_id, time_range)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (id) DO UPDATE SET
+                created_at = EXCLUDED.created_at,
+                tb_host = EXCLUDED.tb_host,
+                device_id = EXCLUDED.device_id,
+                time_range = EXCLUDED.time_range
+        """, (sid, created_at, host, device_id, time_range))
+    else:
+        # SQLite: Use INSERT OR REPLACE
+        cur.execute("INSERT OR REPLACE INTO sessions VALUES (?,?,?,?,?)",
+                  (sid, created_at, host, device_id, time_range))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+def get_session_logs(session_id):
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=DictCursor) if DATABASE_URL else conn.cursor()
+    placeholder = "%s" if DATABASE_URL else "?"
+    cur.execute(
+        f"SELECT agent_name, status, message, created_at FROM agent_logs "
+        f"WHERE session_id = {placeholder} ORDER BY created_at", (session_id,)
+    )
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return [dict(r) for r in rows]

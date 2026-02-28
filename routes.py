@@ -4,7 +4,7 @@ from flask import Blueprint, render_template, request, jsonify, session, redirec
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from config import GROQ_API_KEY, TB_PRESETS, TIME_RANGES
-from database import get_db, log_agent, create_user, get_user_by_email, get_user_by_id
+from database import get_db, log_agent, create_user, get_user_by_email, get_user_by_id, get_session_logs
 from pipeline import run_pipeline
 
 bp = Blueprint("main", __name__)
@@ -180,10 +180,5 @@ def run_dashboard():
 @bp.route("/logs/<session_id>")
 @login_required
 def get_logs(session_id):
-    c = get_db()
-    rows = c.execute(
-        "SELECT agent_name,status,message,created_at FROM agent_logs "
-        "WHERE session_id=? ORDER BY created_at", (session_id,)
-    ).fetchall()
-    c.close()
-    return jsonify([dict(r) for r in rows])
+    rows = get_session_logs(session_id)
+    return jsonify(rows)
