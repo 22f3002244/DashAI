@@ -1,3 +1,4 @@
+from datetime import datetime
 import json
 import math
 from database import log_agent
@@ -93,7 +94,11 @@ def agent_data_cleaner(state):
                     slope, trend = 0, "stable"
 
                 anomalies = [i for i,v in enumerate(vals) if std>0 and abs(v-avg)>2.5*std]
-                cleaned_num[key] = {"values": vals[-300:], "timestamps": tss[-300:], "count": n, "unit": _unit(key)}
+                val_slice = vals[-300:]
+                ts_slice = tss[-300:]
+                anomaly_flags = [(std>0 and abs(v-avg)>2.5*std) for v in val_slice]
+                
+                cleaned_num[key] = {"values": val_slice, "timestamps": ts_slice, "anomaly_flags": anomaly_flags, "count": n, "unit": _unit(key)}
                 stats[key] = {"type":"numeric","avg":round(avg,4),"min":round(mn,4),"max":round(mx,4),
                               "std":round(std,4),"trend":trend,"slope":round(slope,6),
                               "anomaly_count":len(anomalies),"count":n,"unit":_unit(key)}
@@ -102,8 +107,10 @@ def agent_data_cleaner(state):
                     patterns.append({"key":key,"type":"trend","severity":"info",
                         "description":f"'{_pretty(key)}' is trending {trend} over the selected period."})
                 if len(anomalies) > 0:
+                    recent = anomalies[-3:]
+                    details = ", ".join(f"{round(vals[i],2)} at {datetime.fromtimestamp(tss[i]/1000).strftime('%H:%M')}" for i in recent)
                     patterns.append({"key":key,"type":"anomaly","severity":"warning",
-                        "description":f"'{_pretty(key)}' has {len(anomalies)} unusual readings that stand out from the normal range."})
+                        "description":f"'{_pretty(key)}' has {len(anomalies)} unusual reading(s) outside normal range. Recent anomalies: {details}."})
                 if std == 0 and n > 1:
                     patterns.append({"key":key,"type":"constant","severity":"info",
                         "description":f"'{_pretty(key)}' has been constant at {vals[0]} {_unit(key)} throughout the period."})

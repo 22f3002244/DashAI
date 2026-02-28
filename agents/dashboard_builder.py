@@ -27,11 +27,25 @@ def _build_chartjs(chart_type, keys, cd):
             fill_opt = True if ds_type == "line" else False
             bg_col = c+"18" if ds_type == "line" and chart_type != "area" else c+"44" if chart_type == "area" else c+"cc"
             
+            a_flags = d.get("anomaly_flags", [])
+            point_bg = []
+            point_r = []
+            base_r = 0 if len(vals)>80 else 2
+            
+            for i, v in enumerate(vals):
+                is_anomaly = (i < len(a_flags) and a_flags[i])
+                if is_anomaly:
+                    point_bg.append("#ef4444")
+                    point_r.append(base_r + 4 if chart_type != "scatter" else 8)
+                else:
+                    point_bg.append(c)
+                    point_r.append(base_r if chart_type != "scatter" else 4)
+            
             ds = {"label": _pretty(key),
                   "type": ds_type,
                   "data": vals if chart_type != "scatter" else [{"x":i,"y":v} for i,v in enumerate(vals)],
                   "borderColor": c, "backgroundColor": bg_col,
-                  "borderWidth": 1.5, "pointRadius": 0 if len(vals)>80 else 2,
+                  "borderWidth": 1.5, "pointRadius": point_r, "pointBackgroundColor": point_bg,
                   "fill": fill_opt, "tension": 0.35}
             datasets.append(ds)
         if not datasets: return None
