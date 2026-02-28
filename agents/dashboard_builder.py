@@ -10,44 +10,54 @@ def _build_chartjs(chart_type, keys, cd):
     bool_ = cd.get("boolean", {})
     str_  = cd.get("string", {})
 
-    if chart_type in ("line","bar","scatter"):
+    if chart_type in ("line","bar","scatter","area","stacked_bar","combo"):
         datasets = []; labels = []
+        _main_type = "bar" if chart_type in ("stacked_bar", "combo") else "line" if chart_type == "area" else chart_type
         for ci, key in enumerate(keys[:4]):
             if key not in num: continue
             d = num[key]; vals = d["values"]; tss = d["timestamps"]
             if not labels and tss:
                 labels = [datetime.fromtimestamp(t/1000).strftime("%d/%m %H:%M") for t in tss]
             c = COLORS[ci % len(COLORS)]
+            
+            ds_type = _main_type
+            if chart_type == "combo":
+                ds_type = "line" if ci == 0 else "bar"
+                
+            fill_opt = True if ds_type == "line" else False
+            bg_col = c+"18" if ds_type == "line" and chart_type != "area" else c+"44" if chart_type == "area" else c+"cc"
+            
             ds = {"label": _pretty(key),
+                  "type": ds_type,
                   "data": vals if chart_type != "scatter" else [{"x":i,"y":v} for i,v in enumerate(vals)],
-                  "borderColor": c, "backgroundColor": c+"18" if chart_type=="line" else c+"cc",
+                  "borderColor": c, "backgroundColor": bg_col,
                   "borderWidth": 1.5, "pointRadius": 0 if len(vals)>80 else 2,
-                  "fill": chart_type=="line", "tension": 0.35}
+                  "fill": fill_opt, "tension": 0.35}
             datasets.append(ds)
         if not datasets: return None
-        sc = {"x": {"ticks": {"color":"#bbb","maxTicksLimit":8,"font":{"size":10}}, "grid": {"color":"#f5f5f5"}},
-              "y": {"ticks": {"color":"#bbb","font":{"size":10}},                   "grid": {"color":"#f5f5f5"}}}
-        return {"type": chart_type, "data": {"labels": labels, "datasets": datasets}, "options": {
+        sc = {"x": {"stacked": chart_type=="stacked_bar", "ticks": {"color":"#bbb","maxTicksLimit":8,"font":{"size":10}}, "grid": {"color":"#f5f5f5"}},
+              "y": {"stacked": chart_type=="stacked_bar", "ticks": {"color":"#bbb","font":{"size":10}},                   "grid": {"color":"#f5f5f5"}}}
+        return {"type": _main_type, "data": {"labels": labels, "datasets": datasets}, "options": {
             "responsive": True, "maintainAspectRatio": False,
             "plugins": {"legend": {"display": len(datasets)>1, "labels": {"color":"#000","font":{"size":11}}},
                         "tooltip": {"mode":"index","intersect":False}},
-            "scales": sc if chart_type in ("line","bar") else {}}}
+            "scales": sc if _main_type in ("line","bar") else {}}}
 
-    if chart_type == "doughnut":
+    if chart_type in ("doughnut", "pie"):
         key = keys[0] if keys else None
         if key and key in bool_:
             b = bool_[key]; tc = sum(1 for e in b["events"] if e["value"]); fc = len(b["events"])-tc
-            return {"type":"doughnut","data":{"labels":["ON","OFF"],
+            return {"type": chart_type, "data":{"labels":["ON","OFF"],
                 "datasets":[{"data":[tc,fc],"backgroundColor":["#10b981","#e5e7eb"],"borderWidth":0}]},
-                "options":{"responsive":True,"maintainAspectRatio":False,"cutout":"65%",
+                "options":{"responsive":True,"maintainAspectRatio":False,"cutout":"65%" if chart_type=="doughnut" else "0%",
                 "plugins":{"legend":{"position":"bottom","labels":{"color":"#000","font":{"size":11}}}}}}
         if key and key in str_:
             freq = str_[key]["freq"]; top = sorted(freq.items(), key=lambda x:-x[1])[:6]
             if not top: return None
             ls, vs = zip(*top)
-            return {"type":"doughnut","data":{"labels":list(ls),
+            return {"type": chart_type, "data":{"labels":list(ls),
                 "datasets":[{"data":list(vs),"backgroundColor":COLORS[:len(vs)],"borderWidth":0}]},
-                "options":{"responsive":True,"maintainAspectRatio":False,"cutout":"65%",
+                "options":{"responsive":True,"maintainAspectRatio":False,"cutout":"65%" if chart_type=="doughnut" else "0%",
                 "plugins":{"legend":{"position":"bottom","labels":{"color":"#000","font":{"size":11}}}}}}
         return None
 
@@ -67,6 +77,21 @@ def _build_chartjs(chart_type, keys, cd):
             "options": {"responsive": True, "maintainAspectRatio": False,
             "plugins": {"legend": {"display": False}},
             "scales": {"r": {"ticks": {"color":"#ccc","font":{"size":10}}, "grid": {"color":"#f0f0f0"}}}}}
+
+    if chart_type == "bubble":
+        if len(keys) < 3: return None
+        kx, ky, kr = keys[0], keys[1], keys[2]
+        if kx not in num or ky not in num or kr not in num: return None
+        vx, vy, vr = num[kx]["values"], num[ky]["values"], num[kr]["values"]
+        length = min(len(vx), len(vy), len(vr))
+        if length == 0: return None
+        rmin, rmax = min(vr), max(vr)
+        def scale_r(r): return 10 if rmax == rmin else 5 + 15 * (r - rmin) / (rmax - rmin)
+        data = [{"x": vx[i], "y": vy[i], "r": scale_r(vr[i])} for i in range(length)]
+        return {"type": "bubble", "data": {"datasets": [{
+            "label": f"{_pretty(ky)} vs {_pretty(kx)} (size: {_pretty(kr)})",
+            "data": data, "backgroundColor": COLORS[0]+"88", "borderColor": COLORS[0]
+        }]}, "options": {"responsive": True, "maintainAspectRatio": False}}
 
     return None
 

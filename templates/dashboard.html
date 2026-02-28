@@ -1857,10 +1857,22 @@
               <div class="cc-title">${esc(c.title)}</div>
               <div class="cc-desc">${esc(c.desc || '')}</div>
             </div>
-            ${['line', 'bar'].includes(c.chart_type) ? `
+            ${['line', 'bar', 'area', 'scatter'].includes(c.chart_type) ? `
             <select class="cc-type" onchange="changeChartType('${c.id}', this.value)" style="cursor:pointer; outline:none; background:transparent;">
                 <option value="line" ${c.chart_type === 'line' ? 'selected' : ''}>LINE</option>
                 <option value="bar" ${c.chart_type === 'bar' ? 'selected' : ''}>BAR</option>
+                <option value="area" ${c.chart_type === 'area' ? 'selected' : ''}>AREA</option>
+                <option value="scatter" ${c.chart_type === 'scatter' ? 'selected' : ''}>SCATTER</option>
+            </select>
+            ` : ['pie', 'doughnut'].includes(c.chart_type) ? `
+            <select class="cc-type" onchange="changeChartType('${c.id}', this.value)" style="cursor:pointer; outline:none; background:transparent;">
+                <option value="pie" ${c.chart_type === 'pie' ? 'selected' : ''}>PIE</option>
+                <option value="doughnut" ${c.chart_type === 'doughnut' ? 'selected' : ''}>DOUGHNUT</option>
+            </select>
+            ` : ['radar', 'polarArea'].includes(c.chart_type) ? `
+            <select class="cc-type" onchange="changeChartType('${c.id}', this.value)" style="cursor:pointer; outline:none; background:transparent;">
+                <option value="radar" ${c.chart_type === 'radar' ? 'selected' : ''}>RADAR</option>
+                <option value="polarArea" ${c.chart_type === 'polarArea' ? 'selected' : ''}>POLAR AREA</option>
             </select>
             ` : `<span class="cc-type">${esc(c.chart_type)}</span>`}
           </div>
@@ -1945,20 +1957,37 @@
     const chart = activeCharts.find(c => c.canvas.id === 'cv-' + chartId);
     if (!chart) return;
 
-    chart.config.type = newType;
+    if (newType === 'area') {
+      chart.config.type = 'line';
+    } else {
+      chart.config.type = newType;
+    }
+
     chart.config.data.datasets.forEach(ds => {
-      if (newType === 'line') {
-        ds.fill = true;
-        if (ds.backgroundColor && ds.backgroundColor.length === 9) {
+      if (newType === 'line' || newType === 'scatter') {
+        ds.fill = false;
+        if (ds.backgroundColor && typeof ds.backgroundColor === 'string' && ds.backgroundColor.length >= 7) {
           ds.backgroundColor = ds.backgroundColor.slice(0, 7) + '18';
         }
-      } else if (newType === 'bar') {
-        ds.fill = false;
-        if (ds.backgroundColor && ds.backgroundColor.length === 9) {
+      } else if (newType === 'area') {
+        ds.fill = true;
+        if (ds.backgroundColor && typeof ds.backgroundColor === 'string' && ds.backgroundColor.length >= 7) {
+          ds.backgroundColor = ds.backgroundColor.slice(0, 7) + '44';
+        }
+      } else if (newType === 'bar' || newType === 'radar' || newType === 'polarArea') {
+        ds.fill = true;
+        if (ds.backgroundColor && typeof ds.backgroundColor === 'string' && ds.backgroundColor.length >= 7) {
           ds.backgroundColor = ds.backgroundColor.slice(0, 7) + 'cc';
         }
       }
     });
+
+    if (['pie', 'doughnut'].includes(newType)) {
+      if (chart.config.options) {
+        chart.config.options.cutout = newType === 'doughnut' ? '65%' : '0%';
+      }
+    }
+
     chart.update();
   }
 
