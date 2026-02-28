@@ -56,19 +56,23 @@ def agent_viz_recommender(state):
 
         sys_p = """You are an expert IoT data visualization AI.
 Return ONLY a valid JSON array — no markdown fences, no explanation whatsoever.
-Choose from these chart types: "line","bar","doughnut","scatter","radar","polarArea","kpi","boolean_status","string_freq"
+Choose from these chart types: "line","bar","doughnut","pie","area","stacked_bar","combo","bubble","scatter","radar","polarArea","kpi","boolean_status","string_freq"
 Each object must have: {"id":str,"title":str,"type":str,"keys":[str,...],"description":str,"priority":int}
 Rules:
-- line: best for time-series numeric trends (group 2-3 related sensors together)
-- bar: compare averages across multiple numeric sensors, or horizontal for string value counts
-- doughnut: boolean on/off ratios, or categorical with ≤6 values
-- scatter: 2 correlated numeric sensors (put both in keys)
-- radar: 3-6 numeric sensors for a multi-dimensional sensor profile
-- polarArea: 3-6 numeric sensors with similar scales
-- kpi: single most critical numeric value (latest/avg)
-- boolean_status: on/off status with percentage bar
-- string_freq: horizontal bar of value frequencies
-Generate 6-9 visualizations. Use only keys that exist in the provided data. Prioritize keys with trends or anomalies."""
+- line: best for time-series numeric trends. Excellent for tracking anomalies over time.
+- bar: best for comparing averages across distinct numeric sensors.
+- doughnut / pie: boolean on/off ratios, or categorical proportions.
+- area: similar to line, but filled below. Great for volume or cumulative metrics.
+- stacked_bar: comparing parts of a whole across multiple sensors.
+- combo: mixing a line and a bar (put 2 keys).
+- bubble: 3 numeric sensors (x, y, r).
+- scatter: 2 correlated numeric sensors (x, y).
+- radar / polarArea: 3-6 numeric sensors for a multi-dimensional profile.
+- kpi: single most critical numeric value (latest/avg).
+- boolean_status: on/off status with percentage bar. Focus on critical statuses.
+- string_freq: horizontal bar of value frequencies.
+Note on Units: You must accurately detect and assign ANY scientific, engineering, or common unit (e.g., kPa, m/s², Hz, ppm, µg/m³, watts, etc.) based on the sensor name or context.
+Generate 6-12 visualizations. Strongly prioritize the MOST important sensors. Use only keys that exist in the provided data."""
 
         num_s = {k: {"avg": v["avg"], "min": v["min"], "max": v["max"], "trend": v.get("trend","?"),
                      "anomalies": v.get("anomaly_count",0), "unit": v.get("unit",""), "n": v["count"]}
@@ -90,7 +94,7 @@ Return the JSON array of 6-9 visualizations."""
         match = re.search(r'\[[\s\S]*\]', ai)
         if not match: raise ValueError("No JSON array in AI response")
         viz_list = json.loads(match.group())
-        valid_t = {"line","bar","doughnut","scatter","radar","polarArea","kpi","boolean_status","string_freq"}
+        valid_t = {"line","bar","doughnut","pie","area","stacked_bar","combo","bubble","scatter","radar","polarArea","kpi","boolean_status","string_freq"}
         viz_list = [v for v in viz_list
                     if isinstance(v, dict) and v.get("type") in valid_t
                     and isinstance(v.get("keys"), list) and v["keys"]]
