@@ -7,8 +7,11 @@ app = Flask(__name__)
 app.secret_key = FLASK_SECRET
 app.register_blueprint(bp)
 
-if __name__ == "__main__":
+# Initialize database on startup
+with app.app_context():
     init_db()
+
+if __name__ == "__main__":
     print("\n" + "─"*44)
     print("  ThingsBoard AI Dashboard")
     print("  http://localhost:5050")

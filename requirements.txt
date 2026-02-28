@@ -10,4 +10,4 @@ psycopg2-binary>=2.9.9
 
 # Optional extras
 # python-dotenv>=1.0.0   # .env is loaded manually, but dotenv works too
-# gunicorn>=21.0.0       # for production deployment
+gunicorn>=21.2.0         # for production deployment
