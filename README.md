@@ -4,17 +4,19 @@ An AI-powered IoT analytics platform that connects to your ThingsBoard instance.
 
 ## Features
 
-- **Google-like AI Native UI** — Modern, clean design with landing and auth pages
-- **Zero-config Connect** — Sign in with email + password or paste a JWT token
-- **Smart Device Picker** — Select from an interactive dropdown
+- **Google-like AI Native UI** — Modern, clean design with customized color palettes.
+- **Zero-config Connect** — Sign in with email + password or paste a JWT token.
+- **Save & Share Dashboards** — Save AI configurations permanently to your database and generate 1-click Read-Only share links.
+- **Interactive Detailed Charts** — All KPI Sensor Cards include full-screen interactive Chart.js graphs tracking raw historical telemetry (up to 60 points).
+- **Live Activity Log & WebSockets** — Stream incoming telemetry live to your Activity Log instantly via Socket.IO without refreshing the page.
+- **PDF Export** — Instantly capture high-quality A4 layout reports of your dashboards.
 - **4-agent AI Pipeline**:
   1. **DataFetcher** — Authenticates and retrieves telemetry & attributes
   2. **DataCleaner** — Cleans, computes stats, and finds patterns in IoT data
   3. **VizRecommender** — AI curates the best charts and visualization methods
   4. **DashboardBuilder** — Assembles the final Dash AI view
-- **Fallback Mode** — Smart default charts if AI generation is unavailable
-- **Secure by Design** — AI API keys are handled server-side
-- **User Authentication** — PostgreSQL registry (default for production via Neon) or local SQLite fallback to save your setup
+- **Conversational BI** — Persistent chat widget lets you talk to your dashboard data.
+- **Fallbacks & Security** — Default charts if AI generation is unavailable, and SQL-backed secure authentication models.
 
 ## Project Structure
 
