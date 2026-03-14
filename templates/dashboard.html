@@ -113,8 +113,9 @@
 
   .connect-card h2 {
     font-size: 1.5rem;
-    font-weight: 800;
-    letter-spacing: -0.04em;
+    font-weight: 700;
+    font-family: var(--font-heading);
+    letter-spacing: -0.03em;
     margin-bottom: .4rem;
     color: var(--black);
   }
@@ -334,13 +335,13 @@
   /* Sidebar */
   .dash-sidebar {
     border-right: var(--border);
-    padding: 1.25rem;
+    padding: 1.4rem;
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
+    gap: 1.4rem;
     position: sticky;
-    top: 62px;
-    height: calc(100vh - 62px);
+    top: 64px;
+    height: calc(100vh - 64px);
     overflow-y: auto;
     background: var(--white);
   }
@@ -374,7 +375,8 @@
   .dic-name {
     font-size: 14px;
     font-weight: 700;
-    letter-spacing: -0.03em;
+    font-family: var(--font-heading);
+    letter-spacing: -0.02em;
     margin-bottom: 2px;
     color: var(--black);
   }
@@ -421,12 +423,12 @@
 
   .p-step.running {
     border-color: var(--black);
-    background: var(--gray-100)
+    background: var(--gray-100);
   }
 
   .p-step.running .p-dot {
     background: var(--black);
-    animation: blink 1s ease-in-out infinite
+    animation: blink 1s ease-in-out infinite;
   }
 
   .p-step.done {
@@ -590,9 +592,10 @@
 
   .dh-title {
     font-size: 22px;
-    font-weight: 800;
-    letter-spacing: -0.04em;
-    color: var(--black)
+    font-weight: 700;
+    font-family: var(--font-heading);
+    letter-spacing: -0.03em;
+    color: var(--black);
   }
 
   .dh-meta {
@@ -624,7 +627,7 @@
   .badge.fill {
     background: var(--black);
     color: var(--white);
-    border-color: var(--black)
+    border-color: var(--black);
   }
 
   /* Summary strip */
@@ -656,7 +659,8 @@
 
   .sum-num {
     font-size: 26px;
-    font-weight: 800;
+    font-weight: 700;
+    font-family: var(--font-heading);
     letter-spacing: -0.04em;
     line-height: 1;
     margin-bottom: 4px;
@@ -727,6 +731,7 @@
   .kc-val {
     font-size: 26px;
     font-weight: 700;
+    font-family: var(--font-heading);
     letter-spacing: -0.04em;
     line-height: 1;
     margin-bottom: 4px;
@@ -844,7 +849,7 @@
   .bc-fill {
     height: 4px;
     background: var(--black);
-    border-radius: 100px
+    border-radius: 100px;
   }
 
   .bc-pcts {
@@ -918,7 +923,7 @@
   .sc-bar-fill {
     height: 3px;
     background: var(--black);
-    border-radius: 100px
+    border-radius: 100px;
   }
 
   .sc-cnt {
@@ -955,9 +960,10 @@
 
   .cc-title {
     font-size: 14px;
-    font-weight: 700;
+    font-weight: 600;
+    font-family: var(--font-heading);
     letter-spacing: -0.02em;
-    color: var(--black)
+    color: var(--black);
   }
 
   .cc-desc {
@@ -1014,11 +1020,12 @@
 
   .hk-val {
     font-size: 38px;
-    font-weight: 800;
-    letter-spacing: -0.05em;
+    font-weight: 700;
+    font-family: var(--font-heading);
+    letter-spacing: -0.04em;
     line-height: 1;
     margin-bottom: 6px;
-    color: var(--black)
+    color: var(--black);
   }
 
   .hk-unit {
@@ -1073,7 +1080,7 @@
   .hb-fill {
     height: 4px;
     background: var(--black);
-    border-radius: 100px
+    border-radius: 100px;
   }
 
   .hb-pcts {
@@ -1337,7 +1344,192 @@
       font-size: 13px;
     }
   }
-</style>
+
+  /* --- CHAT WIDGET --- */
+  #chat-widget-btn {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--blue);
+    color: white;
+    font-size: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    cursor: pointer;
+    z-index: 1000;
+    transition: transform 0.2s, background 0.2s;
+  }
+  #chat-widget-btn:hover {
+    transform: scale(1.05);
+    background: var(--blue-dark);
+  }
+  #chat-panel {
+    position: fixed;
+    bottom: 90px;
+    right: 24px;
+    width: 380px;
+    height: 500px;
+    max-height: calc(100vh - 120px);
+    background: white;
+    border-radius: var(--radius-lg);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+    display: flex;
+    flex-direction: column;
+    z-index: 1000;
+    overflow: hidden;
+    transform: translateY(20px);
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s;
+  }
+  #chat-panel.active {
+    transform: translateY(0);
+    opacity: 1;
+    pointer-events: all;
+  }
+  .cp-header {
+    background: var(--blue);
+    color: white;
+    padding: 16px;
+    font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .cp-close {
+    cursor: pointer;
+    opacity: 0.8;
+  }
+  .cp-close:hover { opacity: 1; }
+  .cp-body {
+    flex: 1;
+    padding: 16px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    background: var(--off-white);
+  }
+  .msg {
+    max-width: 85%;
+    padding: 10px 14px;
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .msg-ai {
+    background: white;
+    border: 1px solid var(--gray-200);
+    align-self: flex-start;
+    border-bottom-left-radius: 4px;
+  }
+  .msg-user {
+    background: #eff6ff;
+    color: #1e3a8a;
+    align-self: flex-end;
+    border-bottom-right-radius: 4px;
+  }
+  .cp-input-area {
+    padding: 12px;
+    background: white;
+    border-top: 1px solid var(--gray-200);
+    display: flex;
+    gap: 8px;
+  }
+  .cp-input-area input {
+    flex: 1;
+    padding: 10px 14px;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-pill);
+    outline: none;
+    font-size: 13px;
+    transition: border-color 0.2s;
+  }
+  .cp-input-area input:focus {
+    border-color: var(--blue);
+  }
+  .cp-send {
+    background: var(--blue);
+    color: white;
+    border: none;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+  }
+  .cp-send:hover { background: var(--blue-dark); }
+  .cp-send:disabled { background: var(--gray-400); cursor: not-allowed; }
+
+  /* --- MODAL --- */
+  .modal-overlay {
+    position: fixed;
+    top: 0; left: 0; width: 100vw; height: 100vh;
+    background: rgba(0,0,0,0.4);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  .modal-overlay.active {
+    opacity: 1;
+    pointer-events: all;
+  }
+  .modal {
+    background: var(--white);
+    width: 90%;
+    max-width: 500px;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    display: flex;
+    flex-direction: column;
+    max-height: 80vh;
+    transform: translateY(10px);
+    transition: transform 0.2s;
+  }
+  .modal-overlay.active .modal {
+    transform: translateY(0);
+  }
+  .modal-header {
+    padding: 20px 24px;
+    border-bottom: var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .modal-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--black);
+    letter-spacing: -0.02em;
+  }
+  .modal-close {
+    cursor: pointer;
+    font-size: 18px;
+    color: var(--gray-400);
+    transition: color 0.2s;
+  }
+  .modal-close:hover { color: var(--black); }
+  .modal-body {
+    padding: 24px;
+    overflow-y: auto;
+    flex: 1;
+  }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
 {% endblock %}
 
 {% block content %}
@@ -1422,6 +1614,7 @@
       </button>
     </div>
 
+    <!-- Saved dashboards modal handles this now -->
   </div>
 </div>
 
@@ -1480,6 +1673,7 @@
 
       <div style="display:flex;gap:10px">
         <button class="btn-full secondary" style="max-width:120px" onclick="goBack()">← Back</button>
+        <button class="btn-full secondary" style="max-width:120px" onclick="showSavedDashboardsModal()">📁 Saved</button>
         <button class="btn-full primary" id="generate-btn" onclick="generateDashboard()">
           Generate Dashboard →
         </button>
@@ -1493,9 +1687,9 @@
      SCREEN 3 — DASHBOARD
 ══════════════════════════════════════════════ -->
 <div id="screen-dashboard" class="screen">
-  <div class="dash-layout">
+  <div class="dash-layout" {% if shared_dashboard %}style="grid-template-columns: 1fr;"{% endif %}>
 
-    <aside class="dash-sidebar">
+    <aside class="dash-sidebar" {% if shared_dashboard %}style="display:none;"{% endif %}>
 
       <div>
         <div class="ds-label">Device</div>
@@ -1544,9 +1738,18 @@
       </div>
 
       <div class="sidebar-actions">
-        <button class="sb-btn primary-sb" onclick="rerunDashboard()">↺ Refresh Data</button>
-        <button class="sb-btn" onclick="changeDevice()">⇄ Change Device</button>
-        <button class="sb-btn" onclick="logout()">→ Sign Out</button>
+        {% if shared_dashboard %}
+          <div style="background: var(--blue-50); border: 1px solid var(--blue-200); padding: 12px; border-radius: var(--radius-sm); margin-top: 10px;">
+            <div style="font-size: 11px; font-weight: 600; color: var(--blue-700); margin-bottom: 4px;">Shared View</div>
+            <div style="font-size: 10px; color: var(--blue-600); line-height: 1.5;">You are viewing a shared dashboard from {{ shared_dashboard.owner_email }}. This is a read-only view.</div>
+          </div>
+          <button class="sb-btn" style="margin-top: 8px;" onclick="window.location.href='/'">Create Your Own</button>
+        {% else %}
+          <button class="sb-btn primary-sb" onclick="showSavedDashboardsModal()">📁 My Dashboards</button>
+          <button class="sb-btn primary-sb" onclick="rerunDashboard()">↺ Refresh Data</button>
+          <button class="sb-btn" onclick="changeDevice()">⇄ Change Device</button>
+          <button class="sb-btn" onclick="logout()">→ Sign Out</button>
+        {% endif %}
       </div>
 
     </aside>
@@ -1557,10 +1760,60 @@
         <p>Your dashboard is being prepared…</p>
         <p class="flow">Data Fetcher → Analyser → AI Chart Picker → Builder</p>
       </div>
-    </main>
+      </main>
 
+    </div>
   </div>
-</div>
+
+  <!-- SAVED DASHBOARDS MODAL -->
+  <div class="modal-overlay" id="saved-dashboards-modal" onclick="if(event.target===this) hideSavedDashboardsModal()">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">My Dashboards</div>
+        <div class="modal-close" onclick="hideSavedDashboardsModal()">✕</div>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 13px; color: var(--gray-500); margin-bottom: 16px;">Quickly jump back to your previously saved configurations.</p>
+        <div id="saved-dashboards-list">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI DETAIL MODAL -->
+  <div class="modal-overlay" id="kpi-detail-modal" onclick="if(event.target===this) hideKpiDetailModal()">
+    <div class="modal" style="max-width: 800px; width: 90%;">
+      <div class="modal-header">
+        <div class="modal-title" id="kpi-detail-title">Detail View</div>
+        <div class="modal-close" onclick="hideKpiDetailModal()">✕</div>
+      </div>
+      <div class="modal-body">
+        <div style="height: 400px; width: 100%;">
+          <canvas id="kpi-detail-canvas"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FLOATING CHAT WIDGET -->
+  <div id="chat-widget-btn" style="display:none;" onclick="toggleChat()" title="Chat with AI Analyst">
+    💬
+  </div>
+  
+  <div id="chat-panel">
+    <div class="cp-header">
+      <span>Dash AI Analyst</span>
+      <span class="cp-close" onclick="toggleChat()">✕</span>
+    </div>
+    <div class="cp-body" id="chat-history">
+      <div class="msg msg-ai">Hi! I'm Ubie. Ask me anything about this dashboard, the data streams, or the insights uncovered.</div>
+    </div>
+    <div class="cp-input-area">
+      <input type="text" id="chat-input" placeholder="Ask about this data..." onkeypress="handleChatKey(event)">
+      <button class="cp-send" id="chat-send-btn" onclick="sendChatMessage()">↑</button>
+    </div>
+  </div>
 
 {% endblock %}
 
@@ -1572,11 +1825,70 @@
     deviceId: '', deviceName: '', timeRange: '24h',
   };
 
-  const PRESET_URLS = {
-  {% for p in tb_presets %} '{{ p.key }}': '{{ p.url }}', {% endfor %}
-  };
+  const PRESET_URLS = {};
+  {% for p in tb_presets %}
+    PRESET_URLS['{{ p.key }}'] = '{{ p.url }}';
+  {% endfor %}
 
   let activeCharts = [];
+  let socket = null;
+
+  function initSocketConnection() {
+    if (!socket) {
+      socket = io();
+      socket.on('telemetry_update', (data) => {
+        handleLiveTelemetry(data);
+      });
+    }
+  }
+
+  function handleLiveTelemetry(data) {
+    if (!data || !activeCharts.length) return;
+    
+    // Convert ThingsBoard timestamp format if needed
+    const nowTs = new Date();
+    const tsLabel = nowTs.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+    activeCharts.forEach(chart => {
+      let updated = false;
+      const metrics = chart.config.data.datasets.map(ds => ds.label);
+      
+      chart.config.data.datasets.forEach((ds, idx) => {
+        // Match the dataset label to the telemetry key
+        const key = ds.label;
+        if (data[key] && data[key].length > 0) {
+          // Thingsboard returns an array. Get the latest value.
+          const latestPoint = data[key][0];
+          const val = parseFloat(latestPoint.value);
+          
+          if (!isNaN(val)) {
+            // Append the new value
+            ds.data.push(val);
+            updated = true;
+          }
+        }
+      });
+
+      if (updated) {
+        // Add the new timestamp label to the x-axis
+        chart.config.data.labels.push(tsLabel);
+        
+        // Keep charts from growing infinitely (e.g. keep max 20 points)
+        const maxPoints = 20;
+        if (chart.config.data.labels.length > maxPoints) {
+            chart.config.data.labels.shift();
+            chart.config.data.datasets.forEach(ds => {
+                ds.data.shift();
+            });
+        }
+        
+        chart.update('none'); // Update without full animation for performance
+        
+        // Live Activity Log Entry
+        appendLog(`<span class="le-time">[${tsLabel}]</span> <span class="le-agent">Live Data</span> — Received new reading for <strong>${key}</strong>: ${val}`);
+      }
+    });
+  }
 
   function showScreen(id) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -1649,7 +1961,158 @@
       select.innerHTML = '<option value="">Could not load devices</option>';
       document.getElementById('device-hint').textContent = 'Enter Device ID manually below.';
     }
+    
+    // Auto-fetch removed; handled by modal now.
   }
+
+  function showSavedDashboardsModal() {
+    document.getElementById('saved-dashboards-modal').classList.add('active');
+    fetchSavedDashboardsList();
+  }
+
+  function hideSavedDashboardsModal() {
+    document.getElementById('saved-dashboards-modal').classList.remove('active');
+  }
+
+  function openDetailChart(idx) {
+    if (!lastGeneratedData || !lastGeneratedData.kpi_cards || !lastGeneratedData.kpi_cards[idx]) return;
+    const k = lastGeneratedData.kpi_cards[idx];
+    document.getElementById('kpi-detail-title').textContent = k.label + ' Detail (' + k.count + ' points)';
+    document.getElementById('kpi-detail-modal').classList.add('active');
+    
+    const canvas = document.getElementById('kpi-detail-canvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Destroy existing chart if any
+    if (window.kpiDetailChart) window.kpiDetailChart.destroy();
+    
+    if (!k.raw_data || !k.raw_data.length) {
+        // Fallback for older saved dashboards
+        alert("Detailed historical data not available for this dashboard export.");
+        hideKpiDetailModal();
+        return;
+    }
+
+    const rawVals = k.raw_data.map(p => p[1]);
+    const rawLabels = k.raw_data.map(p => {
+       const d = new Date(p[0]);
+       return d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    });
+
+    let color = '#2563eb'; // blue
+    if (k.trend === 'falling') color = '#dc2626'; // red
+    if (k.trend === 'rising') color = '#16a34a'; // green
+    
+    window.kpiDetailChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: rawLabels,
+        datasets: [{
+          label: k.label,
+          data: rawVals,
+          borderColor: color,
+          backgroundColor: color + '20',
+          borderWidth: 2,
+          pointRadius: 2,
+          pointHoverRadius: 6,
+          fill: true,
+          tension: 0.3
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { 
+            legend: { display: false }, 
+            tooltip: { enabled: true, mode: 'index', intersect: false } 
+        },
+        scales: {
+          x: { display: true },
+          y: { display: true, suggestedMin: k.min - (k.max-k.min)*0.1, suggestedMax: k.max + (k.max-k.min)*0.1 }
+        },
+        interaction: { mode: 'index', intersect: false }
+      }
+    });
+  }
+
+  function hideKpiDetailModal() {
+    document.getElementById('kpi-detail-modal').classList.remove('active');
+  }
+
+  async function fetchSavedDashboardsList() {
+    const listCont = document.getElementById('saved-dashboards-list');
+    listCont.innerHTML = '<div style="font-size:13px; color:var(--gray-500);">Loading...</div>';
+    
+    try {
+        const res = await fetch('/api/dashboards');
+        if (!res.ok) throw new Error('Fetch failed');
+        const dashboards = await res.json();
+        
+        if (dashboards && dashboards.length > 0) {
+            listCont.innerHTML = dashboards.map(d => `
+                <div style="border: var(--border); border-radius: var(--radius-sm); padding: 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; background: var(--gray-100);">
+                    <div>
+                        <div style="font-size: 13px; font-weight: 600; color: var(--black);">${esc(d.name)}</div>
+                        <div style="font-size: 11px; color: var(--gray-400); font-family: var(--mono); margin-top: 4px;">Created: ${new Date(d.created_at * 1000).toLocaleDateString()}</div>
+                    </div>
+                    <button class="sb-btn primary-sb" style="width: auto; padding: 6px 12px; font-size: 11px;" onclick="loadSavedDashboard(${d.id})">Open</button>
+                </div>
+            `).join('');
+        } else {
+            listCont.innerHTML = '<div style="font-size:13px; color:var(--gray-500);">No saved dashboards found.</div>';
+        }
+    } catch (e) {
+        listCont.innerHTML = '<div style="font-size:13px; color:var(--error);">Failed to load dashboards.</div>';
+    }
+  }
+
+  async function loadSavedDashboard(id) {
+    hideSavedDashboardsModal();
+    try {
+        const res = await fetch(`/api/dashboards/${id}`);
+        if (!res.ok) {
+            alert('Could not load dashboard.');
+            return;
+        }
+        
+        const dashData = await res.json();
+        let configData;
+        
+        try {
+            configData = typeof dashData.config === 'string' ? JSON.parse(dashData.config) : dashData.config;
+        } catch(e) {
+            alert('Loaded dashboard contains invalid configuration data.');
+            return;
+        }
+        
+        if (configData) {
+            showScreen('dashboard');
+            destroyCharts();
+            clearLog();
+            
+            // Re-populate S object context
+            S.deviceId = configData.device_id || '';
+            S.deviceName = configData.device_name || '';
+            
+            document.getElementById('sid-name').textContent = configData.device_name || 'Saved Dashboard';
+            document.getElementById('sid-type').textContent = configData.device_type || '';
+            
+            lastGeneratedData = configData;
+            currentShareToken = dashData.share_token; // Load the token so sharing works immediately
+            
+            renderDashboard(configData, [], []);
+        }
+        
+    } catch (e) {
+        alert('Failed to load dashboard from server.');
+    }
+  }
+
+  function showSavedDashboardsList() {
+    showScreen('device');
+    fetchSavedDashboardsForConnectScreen();
+  }
+
 
   function renderDeviceList(devices) {
     const select = document.getElementById('device-select');
@@ -1734,6 +2197,8 @@
       }
 
       const d = data.dashboard_data;
+      lastGeneratedData = d;
+      currentShareToken = null;
       document.getElementById('sid-name').textContent = d.device_name || S.deviceName;
       document.getElementById('sid-type').textContent = d.device_type || '';
       document.getElementById('sid-meta').innerHTML =
@@ -1749,6 +2214,7 @@
   }
 
   async function rerunDashboard() {
+
     if (!S.deviceId || !S.token) return;
     await generateDashboard();
   }
@@ -1795,11 +2261,20 @@
           Last updated: ${fa}
         </div>
       </div>
-      <div class="dh-badges">
-        <span class="badge fill">${esc(d.time_range_label)}</span>
-        ${d.numeric_count ? `<span class="badge">${d.numeric_count} sensors</span>` : ''}
-        ${d.boolean_count ? `<span class="badge">${d.boolean_count} on/off</span>` : ''}
-        ${d.string_count ? `<span class="badge">${d.string_count} text</span>` : ''}
+      <div style="display:flex; flex-direction:column; align-items:flex-end; gap:10px;">
+        <div class="dh-badges">
+          <span class="badge fill">${esc(d.time_range_label)}</span>
+          ${d.numeric_count ? `<span class="badge">${d.numeric_count} sensors</span>` : ''}
+          ${d.boolean_count ? `<span class="badge">${d.boolean_count} on/off</span>` : ''}
+          ${d.string_count ? `<span class="badge">${d.string_count} text</span>` : ''}
+        </div>
+        {% if not shared_dashboard %}
+        <div style="display:flex; gap:8px;">
+          <button class="sb-btn primary-sb" style="padding: 6px 12px; font-size: 11px; width: auto;" onclick="saveCurrentDashboard()"> Save</button>
+          <button class="sb-btn" style="padding: 6px 12px; font-size: 11px; width: auto;" onclick="shareCurrentDashboard()"> Share</button>
+          <button class="sb-btn" style="padding: 6px 12px; font-size: 11px; width: auto;" onclick="exportCurrentDashboardPDF()"> Export</button>
+        </div>
+        {% endif %}
       </div>
     </div>`;
 
@@ -1817,14 +2292,16 @@
     if (d.kpi_cards?.length) {
       html += `<div class="sec-hdr"><span class="sec-title">Sensor Readings</span><span class="sec-count">${d.kpi_cards.length} sensors</span></div>`;
       html += '<div class="kpi-grid">';
-      d.kpi_cards.forEach(k => {
+      d.kpi_cards.forEach((k, idx) => {
         const tc = k.trend === 'rising' ? 'rising' : k.trend === 'falling' ? 'falling' : '';
         const ts = k.trend === 'rising' ? '↑ rising' : k.trend === 'falling' ? '↓ falling' : '→ stable';
         html += `
-        <div class="kpi-card">
-          <div class="kc-label">${esc(k.label)}</div>
-          <div class="kc-val">${fmtNum(k.avg)}<span class="kc-unit">${k.unit ? ' ' + esc(k.unit) : ''}</span></div>
-          <div class="kc-range"><span>Min ${fmtNum(k.min)}</span><span>Max ${fmtNum(k.max)}</span></div>
+        <div class="kpi-card" style="display:flex; flex-direction:column; justify-content:space-between; cursor:pointer; transition: transform 0.2s; border: 1px solid transparent;" onclick="openDetailChart(${idx})" onmouseover="this.style.transform='translateY(-2px)'; this.style.borderColor='var(--blue-200)';" onmouseout="this.style.transform='none'; this.style.borderColor='transparent';">
+          <div>
+            <div class="kc-label">${esc(k.label)}</div>
+            <div class="kc-val">${fmtNum(k.avg)}<span class="kc-unit">${k.unit ? ' ' + esc(k.unit) : ''}</span></div>
+            <div class="kc-range"><span>Min ${fmtNum(k.min)}</span><span>Max ${fmtNum(k.max)}</span></div>
+          </div>
           <div class="kc-footer">
             <span class="tag ${tc}">${ts}</span>
             ${k.anomaly_count > 0 ? `<span class="tag warn">${k.anomaly_count} anomalies</span>` : ''}
@@ -1986,9 +2463,33 @@
       try {
         const canvas = document.getElementById(`cv-${c.id}`);
         if (!canvas || !c.config) return;
+        
+        // Apply responsive animation config
+        c.config.options = c.config.options || {};
+        c.config.options.animation = { duration: 400 };
+        
         activeCharts.push(new Chart(canvas, c.config));
       } catch (e) { console.warn('Chart render failed:', c.id, e); }
     });
+
+    // Removed inline sparkline generation
+    
+    // Connect to WebSocket and subscribe for live updates
+    initSocketConnection();
+    if (socket) {
+        let hst = S.host;
+        if (!hst && lastGeneratedData) hst = lastGeneratedData.tb_host;
+        if (hst) {
+            socket.emit('subscribe_telemetry', {
+                tb_host: hst,
+                tb_token: S.token,
+                device_id: S.deviceId
+            });
+        }
+    }
+    
+    // Show chat button
+    document.getElementById('chat-widget-btn').style.display = 'flex';
   }
 
   function fmtNum(n) {
@@ -2056,12 +2557,228 @@
     return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   }
 
-  function logout() {
-    S.token = ''; S.userName = ''; S.deviceId = ''; S.host = '';
-    document.getElementById('tb_email').value = '';
-    document.getElementById('tb_password').value = '';
-    document.getElementById('tb_token_paste').value = '';
-    showScreen('connect');
+  // --- DASHBOARD SAVING & SHARING ---
+  let lastGeneratedData = null;
+  let currentShareToken = null;
+
+  async function saveCurrentDashboard() {
+    if (!lastGeneratedData) {
+        alert("No dashboard data to save!");
+        return;
+    }
+    
+    const name = prompt("Enter a name for this dashboard:", lastGeneratedData.device_name + " - " + new Date().toLocaleDateString());
+    if (!name) return;
+    
+    const saveBtn = document.querySelector('button[onclick="saveCurrentDashboard()"]');
+    if (saveBtn) {
+        saveBtn.textContent = ' Saving...';
+        saveBtn.disabled = true;
+    }
+
+    // Attempt to merge back any user-edits into the config payload
+    const dataToSave = JSON.parse(JSON.stringify(lastGeneratedData));
+    
+    // For chart js blocks, update the config and type
+    if (dataToSave.chart_blocks) {
+        dataToSave.chart_blocks.forEach(cb => {
+            if (cb.render_type === 'chartjs') {
+                const ac = activeCharts.find(c => c.canvas.id === 'cv-' + cb.id);
+                if (ac) {
+                    cb.chart_type = ac.config.type;
+                    if (cb.config) {
+                        cb.config.type = ac.config.type;
+                        if (cb.config.data && cb.config.data.datasets && ac.config.data && ac.config.data.datasets) {
+                            cb.config.data.datasets.forEach((ds, i) => {
+                                 const ads = ac.config.data.datasets[i];
+                                 if (ads) {
+                                     ds.fill = ads.fill;
+                                     ds.backgroundColor = ads.backgroundColor;
+                                 }
+                            });
+                        }
+                        if (['pie', 'doughnut'].includes(ac.config.type) && cb.config.options && ac.config.options) {
+                            cb.config.options.cutout = ac.config.options.cutout;
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    try {
+        const res = await post('/api/dashboards', { name: name, config: dataToSave });
+        const data = await res.json();
+        if (saveBtn) { saveBtn.textContent = ' Save'; saveBtn.disabled = false; }
+        
+        if (res.ok) {
+            currentShareToken = data.share_token;
+            alert("Dashboard saved successfully!");
+        } else {
+            alert(data.error || "Failed to save dashboard.");
+        }
+    } catch (e) {
+        if (saveBtn) { saveBtn.textContent = ' Save'; saveBtn.disabled = false; }
+        alert("Connection error when saving dashboard.");
+    }
+  }
+
+  function shareCurrentDashboard() {
+    if (!currentShareToken) {
+        alert("Please save the dashboard first before sharing.");
+        return;
+    }
+    const shareUrl = window.location.origin + "/share/" + currentShareToken;
+    navigator.clipboard.writeText(shareUrl).then(() => {
+        alert("Share link copied to clipboard!\n" + shareUrl);
+    }).catch(err => {
+        alert("Share link generated:\n" + shareUrl);
+    });
+  }
+
+  function exportCurrentDashboardPDF() {
+    const element = document.getElementById('dash-main');
+    if (!element) { alert('No dashboard to export yet.'); return; }
+    if (typeof html2pdf === 'undefined') { alert('PDF library not loaded yet. Please wait a moment.'); return; }
+
+    const btn = document.querySelector('button[onclick="exportCurrentDashboardPDF()"]');
+    if (btn) { btn.textContent = ' Exporting...'; btn.disabled = true; }
+
+    const originalHeight = element.style.height;
+    const originalOverflow = element.style.overflow;
+    element.style.height = 'auto';
+    element.style.overflow = 'visible';
+
+    const deviceName = (lastGeneratedData && lastGeneratedData.device_name) ? lastGeneratedData.device_name.replace(/[^a-z0-9]/gi, '_') : 'dashboard';
+    const filename = `${deviceName}_${new Date().toLocaleDateString('en-GB').replace(/\//g, '-')}.pdf`;
+
+    const opt = {
+      margin:      [0.4, 0.4],
+      filename:    filename,
+      image:       { type: 'jpeg', quality: 0.97 },
+      html2canvas: { scale: 2, useCORS: true, logging: false },
+      jsPDF:       { unit: 'in', format: 'letter', orientation: 'landscape' }
+    };
+
+    html2pdf().set(opt).from(element).save().then(() => {
+        setTimeout(() => {
+            element.style.height = originalHeight;
+            element.style.overflow = originalOverflow;
+            if (btn) { btn.textContent = ' Export'; btn.disabled = false; }
+        }, 800);
+    }).catch(err => {
+        console.error('PDF Export error:', err);
+        element.style.height = originalHeight;
+        element.style.overflow = originalOverflow;
+        if (btn) { btn.textContent = ' Export'; btn.disabled = false; }
+        alert('Export failed: ' + err.message);
+    });
+  }
+
+  // Ensure a shared dashboard renders automatically on load
+  const isSharedDashboard = {% if shared_dashboard %}true{% else %}false{% endif %};
+  if (isSharedDashboard) {
+      document.addEventListener("DOMContentLoaded", () => {
+          showScreen('dashboard');
+          const shareDataStr = `{{ shared_dashboard.config | safe if shared_dashboard else '{}' }}`;
+          try {
+              const shareData = JSON.parse(shareDataStr);
+              S.deviceId = shareData.device_id || '';
+              S.deviceName = shareData.device_name || '';
+              document.getElementById('sid-name').textContent = shareData.device_name || 'Shared Dashboard';
+              document.getElementById('sid-type').textContent = shareData.device_type || '';
+              
+              lastGeneratedData = shareData; // Attach payload so detailed modals can read raw_data
+              
+              // Since rendering requires these elements to be empty first
+              clearLog();
+              renderDashboard(shareData, [], []);
+          } catch (e) {
+              console.error("Failed to parse shared dashboard config", e);
+          }
+      });
+  }
+
+  // --- CONVERSATIONAL AI (CHAT) ---
+  let chatContextHistory = [];
+  
+  function toggleChat() {
+    const panel = document.getElementById('chat-panel');
+    panel.classList.toggle('active');
+    if (panel.classList.contains('active')) {
+        document.getElementById('chat-input').focus();
+    }
+  }
+
+  function handleChatKey(e) {
+    if (e.key === 'Enter') sendChatMessage();
+  }
+
+  async function sendChatMessage() {
+    const input = document.getElementById('chat-input');
+    const msg = input.value.trim();
+    if (!msg) return;
+
+    // Append User Message
+    appendChatMessage('user', msg);
+    input.value = '';
+    
+    // Disable input while waiting
+    input.disabled = true;
+    document.getElementById('chat-send-btn').disabled = true;
+    
+    // Show typing indicator
+    const typingId = 'typing-' + Date.now();
+    appendChatMessage('ai', '...', typingId);
+
+    try {
+        const payload = {
+            message: msg,
+            context: lastGeneratedData || {},
+            history: chatContextHistory
+        };
+        
+        const res = await post('/api/chat', payload);
+        const data = await res.json();
+        
+        // Remove typing indicator
+        const typingEl = document.getElementById(typingId);
+        if (typingEl) typingEl.remove();
+
+        if (!res.ok) {
+            appendChatMessage('ai', 'Error: ' + (data.error || 'Server connection failed.'));
+        } else {
+            appendChatMessage('ai', data.reply);
+            // Save to history
+            chatContextHistory.push({ role: 'user', content: msg });
+            chatContextHistory.push({ role: 'assistant', content: data.reply });
+            // Keep history short
+            if (chatContextHistory.length > 20) chatContextHistory.splice(0, 2);
+        }
+    } catch (e) {
+        const typingEl = document.getElementById(typingId);
+        if (typingEl) typingEl.remove();
+        appendChatMessage('ai', 'Failed to reach the AI engine.');
+    } finally {
+        input.disabled = false;
+        document.getElementById('chat-send-btn').disabled = false;
+        input.focus();
+    }
+  }
+
+  function appendChatMessage(role, text, idStr = null) {
+    const box = document.getElementById('chat-history');
+    const div = document.createElement('div');
+    div.className = `msg msg-${role}`;
+    if (idStr) div.id = idStr;
+    
+    // Simple markdown formatting (bold, newlines)
+    let formattedHTML = esc(text).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    formattedHTML = formattedHTML.replace(/\n/g, '<br>');
+    div.innerHTML = formattedHTML;
+    
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
   }
 </script>
 {% endblock %}

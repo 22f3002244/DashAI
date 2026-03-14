@@ -44,6 +44,15 @@ def init_db():
                 message TEXT, 
                 created_at DOUBLE PRECISION
             );
+            CREATE TABLE IF NOT EXISTS dashboards (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER,
+                name TEXT,
+                config TEXT,
+                created_at DOUBLE PRECISION,
+                share_token TEXT UNIQUE,
+                FOREIGN KEY (user_id) REFERENCES users (id)
+            );
         """)
     else:
         # SQLite syntax
@@ -61,6 +70,15 @@ def init_db():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 session_id TEXT, agent_name TEXT,
                 status TEXT, message TEXT, created_at REAL
+            );
+            CREATE TABLE IF NOT EXISTS dashboards (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                name TEXT,
+                config TEXT,
+                created_at REAL,
+                share_token TEXT UNIQUE,
+                FOREIGN KEY (user_id) REFERENCES users (id)
             );
         """)
     conn.commit()
@@ -148,3 +166,90 @@ def get_session_logs(session_id):
     cur.close()
     conn.close()
     return [dict(r) for r in rows]
+
+def save_dashboard(user_id, name, config, share_token):
+    conn = get_db()
+    cur = conn.cursor()
+    placeholder = "%s" if DATABASE_URL else "?"
+    
+    # Check if dashboard with same name exists for this user
+    cur.execute(f"SELECT id FROM dashboards WHERE user_id = {placeholder} AND name = {placeholder}", (user_id, name))
+    existing = cur.fetchone()
+    
+    if existing:
+        idx = existing[0] if isinstance(existing, tuple) else existing["id"]
+        cur.execute(f"UPDATE dashboards SET config = {placeholder}, share_token = {placeholder} WHERE id = {placeholder}", 
+                    (config, share_token, idx))
+        dashboard_id = idx
+    else:
+        if DATABASE_URL:
+            cur.execute("""
+                INSERT INTO dashboards (user_id, name, config, created_at, share_token) 
+                VALUES (%s, %s, %s, %s, %s) RETURNING id
+            """, (user_id, name, config, time.time(), share_token))
+            dashboard_id = cur.fetchone()[0]
+        else:
+            cur.execute("""
+                INSERT INTO dashboards (user_id, name, config, created_at, share_token) 
+                VALUES (?, ?, ?, ?, ?)
+            """, (user_id, name, config, time.time(), share_token))
+            dashboard_id = cur.lastrowid
+            
+    conn.commit()
+    cur.close()
+    conn.close()
+    return dashboard_id
+
+def get_dashboards(user_id):
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=DictCursor) if DATABASE_URL else conn.cursor()
+    placeholder = "%s" if DATABASE_URL else "?"
+    cur.execute(
+        f"SELECT id, name, created_at, share_token FROM dashboards "
+        f"WHERE user_id = {placeholder} ORDER BY created_at DESC", (user_id,)
+    )
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return [dict(r) for r in rows]
+
+def get_dashboard(dashboard_id, user_id):
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=DictCursor) if DATABASE_URL else conn.cursor()
+    placeholder = "%s" if DATABASE_URL else "?"
+    cur.execute(
+        f"SELECT * FROM dashboards WHERE id = {placeholder} AND user_id = {placeholder}", 
+        (dashboard_id, user_id)
+    )
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+    return dict(row) if row else None
+
+def get_dashboard_by_token(token):
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=DictCursor) if DATABASE_URL else conn.cursor()
+    placeholder = "%s" if DATABASE_URL else "?"
+    cur.execute(
+        f"SELECT d.*, u.email as owner_email FROM dashboards d "
+        f"JOIN users u ON d.user_id = u.id "
+        f"WHERE d.share_token = {placeholder}", 
+        (token,)
+    )
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+    return dict(row) if row else None
+
+def delete_dashboard(dashboard_id, user_id):
+    conn = get_db()
+    cur = conn.cursor()
+    placeholder = "%s" if DATABASE_URL else "?"
+    cur.execute(
+        f"DELETE FROM dashboards WHERE id = {placeholder} AND user_id = {placeholder}", 
+        (dashboard_id, user_id)
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
+    return True

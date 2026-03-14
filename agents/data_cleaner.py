@@ -1,7 +1,21 @@
 from datetime import datetime
 import json
 import math
+import requests
+from config import GROQ_API_KEY
 from database import log_agent
+
+def _groq_data_cleaner(system, user, model="llama-3.1-8b-instant"):
+    if not GROQ_API_KEY or GROQ_API_KEY == "your_groq_api_key_here":
+        return None
+    r = requests.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
+        json={"model": model, "messages": [{"role": "system", "content": system},
+              {"role": "user", "content": user}], "temperature": 0.2, "max_tokens": 1024},
+        timeout=15)
+    r.raise_for_status()
+    return r.json()["choices"][0]["message"]["content"]
 
 def _classify(v) -> str:
     if v is None: return "null"
@@ -192,11 +206,30 @@ def agent_data_cleaner(state):
             "stats":stats,"attr_stats":attr_stats,
             "numeric_keys":num_keys,"boolean_keys":bool_keys,
             "string_keys":str_keys,"json_keys":json_keys}
+            
+        # --- Cross-Device Correlation AI Pass ---
+        if stats and len(stats) >= 2 and GROQ_API_KEY and GROQ_API_KEY != "your_groq_api_key_here":
+            try:
+                log_agent(sid, "DataCleaner", "running", "Deep AI scan for cross-device & cross-sensor correlations...")
+                sys_p = """You are an IoT Data Analyst. Review the provided stats and detect any potential logical correlations between different sensors or devices (e.g. 'When Device A temp rises, Device B cooling status is ON'). Provide 1 to 3 insightful correlations. Return ONLY a valid JSON list of objects. Like this: [{"key": "Cross-Device Insight", "type": "correlation", "severity": "info", "description": "Your insight here."}]"""
+                num_s = {k: {"trend": v.get("trend","?"), "anomalies": v.get("anomaly_count",0)} for k, v in stats.items() if v.get("type") == "numeric"}
+                usr_p = f"Stats summary:\n{json.dumps(num_s)}\n\nExisting raw algorithmic patterns:\n{json.dumps(patterns[:5])}"
+                import re
+                ai_resp = _groq_data_cleaner(sys_p, usr_p)
+                if ai_resp:
+                    match = re.search(r'\[[\s\S]*\]', ai_resp)
+                    if match:
+                        ai_patterns = json.loads(match.group())
+                        for ap in ai_patterns:
+                            if isinstance(ap, dict) and 'description' in ap:
+                                patterns.append(ap)
+            except Exception as e:
+                pass # Non-critical fallback
+                
         state["patterns"] = patterns
         state["agent_statuses"]["DataCleaner"] = "done"
         log_agent(sid,"DataCleaner","done",
-                  f"Analysis complete: {len(num_keys)} numeric sensors, {len(bool_keys)} on/off sensors, "
-                  f"{len(str_keys)} text sensors. {len(patterns)} patterns detected.")
+                  f"Analysis complete: {len(num_keys)} numeric sensors. {len(patterns)} patterns detected.")
 
     except Exception as e:
         import traceback; traceback.print_exc()

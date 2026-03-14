@@ -126,11 +126,40 @@ def agent_dashboard_builder(state):
         bool_ = cd.get("boolean",{})
         str_  = cd.get("string",{})
 
-        kpi_cards = [{"key":k,"label":_pretty(k),
-                      "avg":v["avg"],"min":v["min"],"max":v["max"],"std":v["std"],
-                      "trend":v.get("trend","stable"),"anomaly_count":v.get("anomaly_count",0),
-                      "count":v["count"],"unit":v.get("unit","")}
-                     for k,v in stats.items() if v.get("type")=="numeric"][:8]
+        def _find_extremes(key):
+            """Return (min_val, min_ts, max_val, max_ts) from the raw cleaned numeric data."""
+            d = num.get(key, {})
+            vals = d.get("values", [])
+            tss  = d.get("timestamps", [])
+            if not vals:
+                return None, None, None, None
+            min_i = vals.index(min(vals))
+            max_i = vals.index(max(vals))
+            return (vals[min_i], tss[min_i] if min_i < len(tss) else None,
+                    vals[max_i], tss[max_i] if max_i < len(tss) else None)
+
+        kpi_cards = []
+        for k, v in stats.items():
+            if v.get("type") != "numeric":
+                continue
+            mn_v, mn_ts, mx_v, mx_ts = _find_extremes(k)
+            
+            raw_data = []
+            if k in num and "timestamps" in num[k] and "values" in num[k]:
+                # Slice to last 60 points so detailed view has a good history
+                ts_list = num[k]["timestamps"][-60:]
+                v_list = num[k]["values"][-60:]
+                raw_data = list(zip(ts_list, v_list))
+                
+            kpi_cards.append({
+                "key": k, "label": _pretty(k),
+                "avg": v["avg"], "min": v["min"], "max": v["max"], "std": v["std"],
+                "trend": v.get("trend", "stable"), "anomaly_count": v.get("anomaly_count", 0),
+                "count": v["count"], "unit": v.get("unit", ""),
+                "min_ts": mn_ts, "max_ts": mx_ts,
+                "raw_data": raw_data
+            })
+        kpi_cards = kpi_cards[:8]
 
         bool_cards = [{"key":k,"label":_pretty(k),
                        "true_count":v.get("true_count",0),"false_count":v.get("false_count",0),

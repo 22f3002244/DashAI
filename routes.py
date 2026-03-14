@@ -1,10 +1,14 @@
 import requests
+import json
+import secrets
+import time
 from functools import wraps
 from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for
 from werkzeug.security import generate_password_hash, check_password_hash
+from apscheduler.schedulers.background import BackgroundScheduler
 
 from config import GROQ_API_KEY, TB_PRESETS, TIME_RANGES
-from database import get_db, log_agent, create_user, get_user_by_email, get_user_by_id, get_session_logs
+from database import get_db, log_agent, create_user, get_user_by_email, get_user_by_id, get_session_logs, save_dashboard, get_dashboards, get_dashboard, delete_dashboard, get_dashboard_by_token
 from pipeline import run_pipeline
 
 bp = Blueprint("main", __name__)
@@ -182,3 +186,203 @@ def run_dashboard():
 def get_logs(session_id):
     rows = get_session_logs(session_id)
     return jsonify(rows)
+
+@bp.route("/api/dashboards", methods=["GET", "POST"])
+@login_required
+def api_dashboards():
+    if request.method == "GET":
+        dashboards = get_dashboards(session["user_id"])
+        return jsonify(dashboards)
+    
+    if request.method == "POST":
+        d = request.json or {}
+        name = d.get("name", "").strip()
+        config = d.get("config")
+        
+        if not name or not config:
+            return jsonify({"error": "Name and config are required."}), 400
+            
+        # Ensure config is a string
+        if not isinstance(config, str):
+            config = json.dumps(config)
+            
+        share_token = secrets.token_urlsafe(16)
+        dashboard_id = save_dashboard(session["user_id"], name, config, share_token)
+        
+        return jsonify({
+            "message": "Dashboard saved successfully.",
+            "id": dashboard_id,
+            "share_token": share_token
+        })
+
+@bp.route("/api/dashboards/<int:dashboard_id>", methods=["GET", "DELETE"])
+@login_required
+def api_dashboard_detail(dashboard_id):
+    if request.method == "GET":
+        dashboard = get_dashboard(dashboard_id, session["user_id"])
+        if not dashboard:
+            return jsonify({"error": "Dashboard not found."}), 404
+        return jsonify(dashboard)
+        
+    if request.method == "DELETE":
+        if delete_dashboard(dashboard_id, session["user_id"]):
+            return jsonify({"message": "Dashboard deleted successfully."})
+        return jsonify({"error": "Failed to delete dashboard."}), 500
+
+@bp.route("/share/<token>")
+def shared_dashboard(token):
+    dashboard = get_dashboard_by_token(token)
+    if not dashboard:
+        return render_template("error.html", message="This shared dashboard link is invalid or has been removed."), 404
+        
+    groq_configured = bool(GROQ_API_KEY and GROQ_API_KEY != "your_groq_api_key_here")
+    
+    # Render the dashboard template but indicate it's a shared (read-only) view
+    return render_template("dashboard.html",
+                           time_ranges=TIME_RANGES,
+                           tb_presets=TB_PRESETS,
+                           groq_configured=groq_configured,
+                           user_email=dashboard.get("owner_email", "Shared User"),
+                           shared_dashboard=dashboard)
+
+@bp.route("/api/chat", methods=["POST"])
+@login_required
+def api_chat():
+    d = request.json or {}
+    message = d.get("message", "").strip()
+    context = d.get("context", {})
+    history = d.get("history", [])
+    
+    if not message:
+        return jsonify({"error": "Message is required."}), 400
+        
+    if not GROQ_API_KEY or GROQ_API_KEY == "your_groq_api_key_here":
+        return jsonify({"error": "Groq API key not configured."}), 400
+        
+    # Build prompt context
+    device_name = context.get("device_name", "IoT Device")
+    system_prompt = f"""You are a helpful IoT Data Analyst AI named Ubie.
+You are helping a user understand their '{device_name}' dashboard data.
+
+Dashboard Overview:
+- Device Type: {context.get("device_type", "Unknown")}
+- Time Range Analysed: {context.get("time_range_label", "Unknown")}
+- Total Data Points: {context.get("total_points", 0):,}
+- Numeric Sensors: {context.get("numeric_count", 0)}, Boolean Sensors: {context.get("boolean_count", 0)}
+
+Sensor Statistics (min, max, average, trend):
+"""
+    # Include detailed kpi_cards data for precise Q&A
+    from datetime import datetime
+    for kpi in context.get("kpi_cards", []):
+        label = kpi.get("label", "?")
+        unit = kpi.get("unit", "")
+        u = f" {unit}" if unit else ""
+        avg = kpi.get("avg","?")
+        mn = kpi.get("min","?")
+        mx = kpi.get("max","?")
+        trend = kpi.get("trend","?")
+        anom = kpi.get("anomaly_count", 0)
+        # Try to get timestamps for min/max if available
+        min_ts = kpi.get("min_ts")
+        max_ts = kpi.get("max_ts")
+        max_str = f"{mx}{u}"
+        min_str = f"{mn}{u}"
+        if max_ts:
+            try: max_str += f" at {datetime.fromtimestamp(int(max_ts)/1000).strftime('%H:%M on %d %b')}"
+            except: pass
+        if min_ts:
+            try: min_str += f" at {datetime.fromtimestamp(int(min_ts)/1000).strftime('%H:%M on %d %b')}"
+            except: pass
+        system_prompt += f"- {label}: avg={avg}{u}, min={min_str}, max={max_str}, trend={trend}"
+        if anom > 0:
+            system_prompt += f", {anom} anomalies detected"
+        system_prompt += "\n"
+
+    system_prompt += "\nKey Patterns & Insights:\n"
+    for p in context.get("patterns", []):
+        system_prompt += f"- [{p.get('type','?').upper()}] {p.get('description','')}\n"
+        
+    system_prompt += "\nAnswer the user's question accurately based on the data above. If you can give a precise value with timestamp, do so. Be concise and direct."
+
+    messages = [{"role": "system", "content": system_prompt}]
+    for h in history[-5:]:  # keep last 5 messages for context
+        messages.append({"role": h.get("role", "user"), "content": h.get("content", "")})
+    messages.append({"role": "user", "content": message})
+    
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": "llama-3.1-8b-instant",
+        "messages": messages,
+        "temperature": 0.4,
+        "max_tokens": 512
+    }
+    
+    try:
+        r = requests.post(url, headers=headers, json=payload, timeout=12)
+        if r.status_code == 200:
+            reply = r.json()["choices"][0]["message"]["content"]
+            return jsonify({"reply": reply})
+        else:
+            return jsonify({"error": f"AI Error: {r.text}"}), 500
+    except Exception as e:
+        return jsonify({"error": f"Failed to connect to AI: {e}"}), 500
+
+
+# ---------------------------------------------------------
+# Real-Time Telemetry Streaming via WebSockets
+# ---------------------------------------------------------
+socketio_instance = None
+active_sessions = {}  # request.sid -> dict
+scheduler = BackgroundScheduler()
+
+def fetch_live_telemetry():
+    """Background job that queries ThingsBoard for latest telemetry values for all active WebSocket sessions"""
+    if not socketio_instance or not active_sessions:
+        return
+        
+    for sid, info in list(active_sessions.items()):
+        try:
+            url = f"{info['host']}/api/plugins/telemetry/DEVICE/{info['device_id']}/values/timeseries"
+            r = requests.get(url, headers={"X-Authorization": f"Bearer {info['token']}"}, timeout=5)
+            if r.status_code == 200:
+                data = r.json()
+                if data:
+                    socketio_instance.emit('telemetry_update', data, to=sid)
+        except Exception:
+            pass
+
+scheduler.add_job(fetch_live_telemetry, 'interval', seconds=3)
+scheduler.start()
+
+def init_socketio(sio):
+    global socketio_instance
+    socketio_instance = sio
+    
+    @sio.on('connect')
+    def handle_connect():
+        pass
+        
+    @sio.on('disconnect')
+    def handle_disconnect():
+        active_sessions.pop(request.sid, None)
+
+    @sio.on('subscribe_telemetry')
+    def handle_subscribe(data):
+        host = data.get('tb_host')
+        token = data.get('tb_token')
+        device_id = data.get('device_id')
+        
+        if host and token and device_id:
+            if not host.startswith("http"):
+                host = "https://" + host
+            active_sessions[request.sid] = {
+                'host': host.rstrip("/"),
+                'token': token,
+                'device_id': device_id
+            }
+
