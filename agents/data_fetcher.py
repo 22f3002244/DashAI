@@ -70,7 +70,7 @@ def agent_data_fetcher(state):
                 r4 = tb_get(host, token, f"/api/plugins/telemetry/DEVICE/{dev_id}/values/timeseries",
                             params={"keys": ",".join(batch),
                                     "startTs": start_ts, "endTs": end_ts,
-                                    "limit": 1000, "agg": "NONE"}, timeout=60)
+                                    "limit": 50000, "agg": "NONE"}, timeout=60)
                 if r4.status_code == 200:
                     telemetry = r4.json()
                     for k, v in telemetry.items():

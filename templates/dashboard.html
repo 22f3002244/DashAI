@@ -1781,7 +1781,7 @@
     </div>
   </div>
 
-  <!-- KPI DETAIL MODAL -->
+  <!-- KPI DETAIL MODAL & CUSTOM THRESHOLDS -->
   <div class="modal-overlay" id="kpi-detail-modal" onclick="if(event.target===this) hideKpiDetailModal()">
     <div class="modal" style="max-width: 800px; width: 90%;">
       <div class="modal-header">
@@ -1791,6 +1791,22 @@
       <div class="modal-body">
         <div style="height: 400px; width: 100%;">
           <canvas id="kpi-detail-canvas"></canvas>
+        </div>
+        
+        <div style="margin-top: 16px; padding: 12px; background: var(--gray-100); border-radius: var(--radius-sm); border: var(--border);">
+            <div style="font-size: 13px; font-weight: 600; margin-bottom: 8px;">Custom Alerts (Live Data)</div>
+            <div style="display: flex; gap: 12px; align-items: center;">
+                <div>
+                    <label style="font-size: 11px; color: var(--gray-500); display: block; margin-bottom: 2px;">Min Threshold</label>
+                    <input type="number" id="detail-thresh-min" style="width: 100px; padding: 4px; border: var(--border); border-radius: 4px; font-size: 12px;">
+                </div>
+                <div>
+                    <label style="font-size: 11px; color: var(--gray-500); display: block; margin-bottom: 2px;">Max Threshold</label>
+                    <input type="number" id="detail-thresh-max" style="width: 100px; padding: 4px; border: var(--border); border-radius: 4px; font-size: 12px;">
+                </div>
+                <button class="sb-btn" style="width: auto; padding: 6px 12px; font-size: 11px; margin-top: 14px;" onclick="saveCustomThresholds()">Apply</button>
+            </div>
+            <div id="detail-thresh-msg" style="font-size: 11px; color: var(--green); margin-top: 6px; display: none;">Saved!</div>
         </div>
       </div>
     </div>
@@ -1830,8 +1846,16 @@
     PRESET_URLS['{{ p.key }}'] = '{{ p.url }}';
   {% endfor %}
 
+  // Detect shared (read-only) view — used throughout to toggle action buttons
+  const isSharedDashboard = {% if shared_dashboard %}true{% else %}false{% endif %};
+
   let activeCharts = [];
   let socket = null;
+  
+  // Custom Live Thresholds { 'Metric Name': { min: number, max: number } }
+  let userAlertThresholds = {};
+
+  let kpiDetailActiveMetric = null;
 
   function initSocketConnection() {
     if (!socket) {
@@ -1843,11 +1867,35 @@
   }
 
   function handleLiveTelemetry(data) {
-    if (!data || !activeCharts.length) return;
+    if (!data) return;
     
     // Convert ThingsBoard timestamp format if needed
     const nowTs = new Date();
     const tsLabel = nowTs.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+    // 1. Process Activity Log and Thresholds
+    Object.keys(data).forEach(key => {
+        if (data[key] && data[key].length > 0) {
+            const latestPoint = data[key][0];
+            const val = parseFloat(latestPoint.value);
+            
+            if (!isNaN(val)) {
+                // Live Custom Alert Threshold Check
+                if (userAlertThresholds[key]) {
+                    const thresh = userAlertThresholds[key];
+                    if ((thresh.min !== null && val < thresh.min) || (thresh.max !== null && val > thresh.max)) {
+                        showToast(`⚠ ALERT: ${key} = ${fmtNum(val)} — violates threshold [Min: ${thresh.min ?? '—'} / Max: ${thresh.max ?? '—'}]`, 'alert');
+                        appendLog(`<span class="le-time">[${tsLabel}]</span> <span class="le-agent">Live Data</span> — <span style="background:var(--red-light); padding:2px 4px; border-radius:4px; color:var(--red); font-weight:bold;">⚠ ALERT: ${esc(key)} = ${fmtNum(val)} out of threshold bounds</span>`);
+                    }
+                }
+                
+                // Live Activity Log Entry
+                appendLog(`<span class="le-time">[${tsLabel}]</span> <span class="le-agent">Live Data</span> — Received new reading for <strong>${esc(key)}</strong>: ${val}`);
+            }
+        }
+    });
+
+    if (!activeCharts.length) return;
 
     activeCharts.forEach(chart => {
       let updated = false;
@@ -1883,9 +1931,6 @@
         }
         
         chart.update('none'); // Update without full animation for performance
-        
-        // Live Activity Log Entry
-        appendLog(`<span class="le-time">[${tsLabel}]</span> <span class="le-agent">Live Data</span> — Received new reading for <strong>${key}</strong>: ${val}`);
       }
     });
   }
@@ -1977,58 +2022,92 @@
   function openDetailChart(idx) {
     if (!lastGeneratedData || !lastGeneratedData.kpi_cards || !lastGeneratedData.kpi_cards[idx]) return;
     const k = lastGeneratedData.kpi_cards[idx];
+    kpiDetailActiveMetric = k.key;  // store raw key so it matches WebSocket telemetry
+    
     document.getElementById('kpi-detail-title').textContent = k.label + ' Detail (' + k.count + ' points)';
     document.getElementById('kpi-detail-modal').classList.add('active');
     
-    const canvas = document.getElementById('kpi-detail-canvas');
-    const ctx = canvas.getContext('2d');
-    
-    // Destroy existing chart if any
-    if (window.kpiDetailChart) window.kpiDetailChart.destroy();
+    // Populate current threshold state into input fields
+    document.getElementById('detail-thresh-min').value = userAlertThresholds[k.key]?.min ?? '';
+    document.getElementById('detail-thresh-max').value = userAlertThresholds[k.key]?.max ?? '';
+    document.getElementById('detail-thresh-msg').style.display = 'none';
     
     if (!k.raw_data || !k.raw_data.length) {
-        // Fallback for older saved dashboards
-        alert("Detailed historical data not available for this dashboard export.");
         hideKpiDetailModal();
+        showToast('No detailed data available for this sensor.', 'warning');
         return;
     }
 
-    const rawVals = k.raw_data.map(p => p[1]);
-    const rawLabels = k.raw_data.map(p => {
-       const d = new Date(p[0]);
-       return d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-    });
+    drawDetailChart(k);
+  }
 
-    let color = '#2563eb'; // blue
-    if (k.trend === 'falling') color = '#dc2626'; // red
-    if (k.trend === 'rising') color = '#16a34a'; // green
-    
-    window.kpiDetailChart = new Chart(ctx, {
+  function drawDetailChart(k) {
+    const canvas = document.getElementById('kpi-detail-canvas');
+    if (!canvas) return;
+    if (window.kpiDetailChart) window.kpiDetailChart.destroy();
+
+    const rawVals   = k.raw_data.map(p => p[1]);
+    const rawLabels = k.raw_data.map(p => new Date(p[0]).toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'}));
+
+    let color = '#2563eb';
+    if (k.trend === 'falling') color = '#dc2626';
+    if (k.trend === 'rising')  color = '#16a34a';
+
+    const thresh = userAlertThresholds[k.key] || {};
+    const datasets = [{
+      label: k.label,
+      data: rawVals,
+      borderColor: color,
+      backgroundColor: color + '20',
+      borderWidth: 2,
+      pointRadius: rawVals.length > 100 ? 0 : 2,
+      pointHoverRadius: 5,
+      fill: true,
+      tension: 0.3,
+      order: 1
+    }];
+
+    // Add threshold reference lines as flat constant datasets
+    if (thresh.min !== null && thresh.min !== undefined) {
+      datasets.push({
+        label: 'Min Threshold',
+        data: Array(rawVals.length).fill(thresh.min),
+        borderColor: '#ef4444',
+        borderWidth: 1.5,
+        borderDash: [6, 4],
+        pointRadius: 0,
+        fill: false,
+        tension: 0,
+        order: 0
+      });
+    }
+    if (thresh.max !== null && thresh.max !== undefined) {
+      datasets.push({
+        label: 'Max Threshold',
+        data: Array(rawVals.length).fill(thresh.max),
+        borderColor: '#16a34a',
+        borderWidth: 1.5,
+        borderDash: [6, 4],
+        pointRadius: 0,
+        fill: false,
+        tension: 0,
+        order: 0
+      });
+    }
+
+    window.kpiDetailChart = new Chart(canvas.getContext('2d'), {
       type: 'line',
-      data: {
-        labels: rawLabels,
-        datasets: [{
-          label: k.label,
-          data: rawVals,
-          borderColor: color,
-          backgroundColor: color + '20',
-          borderWidth: 2,
-          pointRadius: 2,
-          pointHoverRadius: 6,
-          fill: true,
-          tension: 0.3
-        }]
-      },
+      data: { labels: rawLabels, datasets },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { 
-            legend: { display: false }, 
-            tooltip: { enabled: true, mode: 'index', intersect: false } 
+        plugins: {
+          legend: { display: datasets.length > 1, labels: { boxWidth: 12, font: { size: 11 } } },
+          tooltip: { mode: 'index', intersect: false }
         },
         scales: {
-          x: { display: true },
-          y: { display: true, suggestedMin: k.min - (k.max-k.min)*0.1, suggestedMax: k.max + (k.max-k.min)*0.1 }
+          x: { display: true, ticks: { font: { size: 10 }, maxTicksLimit: 12 } },
+          y: { display: true, ticks: { font: { size: 10 } } }
         },
         interaction: { mode: 'index', intersect: false }
       }
@@ -2037,6 +2116,26 @@
 
   function hideKpiDetailModal() {
     document.getElementById('kpi-detail-modal').classList.remove('active');
+    kpiDetailActiveMetric = null;
+  }
+
+  function saveCustomThresholds() {
+    if (!kpiDetailActiveMetric) return;
+    const minVal = document.getElementById('detail-thresh-min').value;
+    const maxVal = document.getElementById('detail-thresh-max').value;
+    
+    userAlertThresholds[kpiDetailActiveMetric] = {
+        min: minVal === '' ? null : parseFloat(minVal),
+        max: maxVal === '' ? null : parseFloat(maxVal)
+    };
+
+    // Immediately redraw the modal chart with threshold lines visible
+    const k = lastGeneratedData?.kpi_cards?.find(c => c.key === kpiDetailActiveMetric);
+    if (k) drawDetailChart(k);
+
+    const msg = document.getElementById('detail-thresh-msg');
+    msg.style.display = 'block';
+    setTimeout(() => { msg.style.display = 'none'; }, 2000);
   }
 
   async function fetchSavedDashboardsList() {
@@ -2268,13 +2367,13 @@
           ${d.boolean_count ? `<span class="badge">${d.boolean_count} on/off</span>` : ''}
           ${d.string_count ? `<span class="badge">${d.string_count} text</span>` : ''}
         </div>
-        {% if not shared_dashboard %}
+        ${ !isSharedDashboard ? `
         <div style="display:flex; gap:8px;">
           <button class="sb-btn primary-sb" style="padding: 6px 12px; font-size: 11px; width: auto;" onclick="saveCurrentDashboard()"> Save</button>
           <button class="sb-btn" style="padding: 6px 12px; font-size: 11px; width: auto;" onclick="shareCurrentDashboard()"> Share</button>
-          <button class="sb-btn" style="padding: 6px 12px; font-size: 11px; width: auto;" onclick="exportCurrentDashboardPDF()"> Export</button>
-        </div>
-        {% endif %}
+          <button class="sb-btn" style="padding: 6px 12px; font-size: 11px; width: auto;" onclick="exportCurrentDashboardPDF()"> PDF</button>
+          <button class="sb-btn" style="padding: 6px 12px; font-size: 11px; width: auto;" onclick="exportCurrentDashboardCSV()"> CSV</button>
+        </div>` : '' }
       </div>
     </div>`;
 
@@ -2351,74 +2450,99 @@
       html += '</div>';
     }
 
-    const charts = d.chart_blocks || [];
-    const kpiBlocks = charts.filter(c => c.render_type === 'kpi_single');
-    const boolBlocks = charts.filter(c => c.render_type === 'boolean_status');
-    const chartBlocks = charts.filter(c => c.render_type === 'chartjs');
+    // --- MODERN ANALYTICS SECTION ---
+    if (d.kpi_cards?.length) {
+      html += `
+      <div class="sec-hdr"><span class="sec-title">Analytics</span><span class="sec-count">4 charts</span></div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
 
-    if (kpiBlocks.length || boolBlocks.length) {
-      html += `<div class="sec-hdr"><span class="sec-title">AI-Selected Highlights</span><span class="sec-count">${kpiBlocks.length + boolBlocks.length} cards</span></div>`;
-      html += '<div class="highlight-grid">';
-      kpiBlocks.forEach(b => {
-        const tc = b.trend === 'rising' ? 'rising' : b.trend === 'falling' ? 'falling' : '';
-        const ts = b.trend === 'rising' ? '↑ rising' : b.trend === 'falling' ? '↓ falling' : '→ stable';
-        html += `
-        <div class="hl-kpi">
-          <div class="hk-label">${esc(b.title)}</div>
-          <div class="hk-val">${fmtNum(b.value)}<span class="hk-unit">${b.unit ? ' ' + esc(b.unit) : ''}</span></div>
-          <span class="tag ${tc}">${ts}</span>
-          <div class="hk-desc">${esc(b.desc)}</div>
-        </div>`;
-      });
-      boolBlocks.forEach(b => {
-        const on = b.last_value;
-        html += `
-        <div class="hl-bool">
-          <div class="hb-label">${esc(b.title)}</div>
-          <div class="hb-state"><div class="hb-dot ${on ? 'on' : 'off'}"></div><div class="hb-text">${on ? 'ON' : 'OFF'}</div></div>
-          <div class="hb-bar"><div class="hb-fill" style="width:${b.true_pct}%"></div></div>
-          <div class="hb-pcts"><span>${b.true_pct}% on</span><span>${b.false_pct}% off</span></div>
-          <div class="hb-desc">${esc(b.desc)}</div>
-        </div>`;
-      });
-      html += '</div>';
-    }
+        <!-- Chart 1: Multi-Sensor Timeline -->
+        <div class="chart-cell" style="grid-column: 1 / -1;">
+          <div class="cc-hdr">
+            <div>
+              <div class="cc-title">Multi-Sensor Timeline</div>
+              <div class="cc-desc">Normalized sensor readings over time (scaled 0-100 for comparison)</div>
+            </div>
+          </div>
+          <div class="chart-wrap" style="height:260px"><canvas id="analytics-timeline"></canvas></div>
+        </div>
 
-    if (chartBlocks.length) {
-      html += `<div class="sec-hdr"><span class="sec-title">AI-Recommended Charts</span><span class="sec-count">${chartBlocks.length} charts</span></div>`;
-      html += '<div class="chart-grid">';
-      chartBlocks.forEach(c => {
-        html += `
+        <!-- Chart 2: Min / Avg / Max Range -->
         <div class="chart-cell">
           <div class="cc-hdr">
             <div>
-              <div class="cc-title">${esc(c.title)}</div>
-              <div class="cc-desc">${esc(c.desc || '')}</div>
+              <div class="cc-title">Value Range Analysis</div>
+              <div class="cc-desc">Min · Average · Max per sensor</div>
             </div>
-            ${['line', 'bar', 'area', 'scatter'].includes(c.chart_type) ? `
-            <select class="cc-type" onchange="changeChartType('${c.id}', this.value)" style="cursor:pointer; outline:none; background:transparent;">
-                <option value="line" ${c.chart_type === 'line' ? 'selected' : ''}>LINE</option>
-                <option value="bar" ${c.chart_type === 'bar' ? 'selected' : ''}>BAR</option>
-                <option value="area" ${c.chart_type === 'area' ? 'selected' : ''}>AREA</option>
-                <option value="scatter" ${c.chart_type === 'scatter' ? 'selected' : ''}>SCATTER</option>
-            </select>
-            ` : ['pie', 'doughnut'].includes(c.chart_type) ? `
-            <select class="cc-type" onchange="changeChartType('${c.id}', this.value)" style="cursor:pointer; outline:none; background:transparent;">
-                <option value="pie" ${c.chart_type === 'pie' ? 'selected' : ''}>PIE</option>
-                <option value="doughnut" ${c.chart_type === 'doughnut' ? 'selected' : ''}>DOUGHNUT</option>
-            </select>
-            ` : ['radar', 'polarArea'].includes(c.chart_type) ? `
-            <select class="cc-type" onchange="changeChartType('${c.id}', this.value)" style="cursor:pointer; outline:none; background:transparent;">
-                <option value="radar" ${c.chart_type === 'radar' ? 'selected' : ''}>RADAR</option>
-                <option value="polarArea" ${c.chart_type === 'polarArea' ? 'selected' : ''}>POLAR AREA</option>
-            </select>
-            ` : `<span class="cc-type">${esc(c.chart_type)}</span>`}
           </div>
-          <div class="chart-wrap"><canvas id="cv-${c.id}"></canvas></div>
-        </div>`;
-      });
-      html += '</div>';
+          <div class="chart-wrap" style="height:220px"><canvas id="analytics-range"></canvas></div>
+        </div>
+
+        <!-- Chart 3: Volatility / Std Dev Radar -->
+        <div class="chart-cell">
+          <div class="cc-hdr">
+            <div>
+              <div class="cc-title">Volatility Radar</div>
+              <div class="cc-desc">Relative standard deviation (coefficient of variation) per sensor</div>
+            </div>
+          </div>
+          <div class="chart-wrap" style="height:220px"><canvas id="analytics-radar"></canvas></div>
+        </div>
+
+        <!-- Chart 4: Anomaly Distribution Bar -->
+        <div class="chart-cell" style="grid-column: 1 / -1;">
+          <div class="cc-hdr">
+            <div>
+              <div class="cc-title">Anomaly Distribution</div>
+              <div class="cc-desc">Number of anomalies detected per sensor, sorted by severity</div>
+            </div>
+          </div>
+          <div class="chart-wrap" style="height:200px"><canvas id="analytics-anomaly"></canvas></div>
+        </div>
+
+      </div>
+
+      <!-- ── Sensor Timelines ──────────────────────────────────── -->
+      <div class="sec-hdr" style="margin-top:8px"><span class="sec-title">Sensor Timelines</span><span class="sec-count" id="sensor-timelines-count"></span></div>
+      <div id="sensor-timelines-grid" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:16px; margin-bottom:20px;"></div>
+
+      <!-- ── Chart Explorer ─────────────────────────────────────── -->
+      <div class="sec-hdr" style="margin-top:8px"><span class="sec-title">Chart Explorer</span><span class="sec-count">Custom view</span></div>
+      <div class="chart-cell" style="margin-bottom: 20px;">
+        <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; padding: 14px 0 10px;">
+
+          <div style="display:flex; flex-direction:column; gap:4px; min-width:160px;">
+            <label style="font-size:10px; font-weight:600; color:var(--gray-500); text-transform:uppercase; letter-spacing:.04em;">Y Axis (Value)</label>
+            <select id="explorer-y" style="font-size:12px; padding:6px 10px; border:1px solid var(--gray-200); border-radius:6px; background:var(--white); color:var(--gray-700); outline:none;"></select>
+          </div>
+
+          <div style="display:flex; flex-direction:column; gap:4px; min-width:160px;">
+            <label style="font-size:10px; font-weight:600; color:var(--gray-500); text-transform:uppercase; letter-spacing:.04em;">X Axis</label>
+            <select id="explorer-x" style="font-size:12px; padding:6px 10px; border:1px solid var(--gray-200); border-radius:6px; background:var(--white); color:var(--gray-700); outline:none;">
+              <option value="__time__">Time</option>
+            </select>
+          </div>
+
+          <div style="display:flex; flex-direction:column; gap:4px;">
+            <label style="font-size:10px; font-weight:600; color:var(--gray-500); text-transform:uppercase; letter-spacing:.04em;">Chart Type</label>
+            <div style="display:flex; gap:6px;">
+              <button id="exp-btn-line"    onclick="setExplorerType('line')"    style="font-size:11px; padding:5px 11px; border-radius:6px; border:1px solid var(--gray-200); background:var(--white); color:var(--gray-600); cursor:pointer;">Line</button>
+              <button id="exp-btn-area"    onclick="setExplorerType('area')"    style="font-size:11px; padding:5px 11px; border-radius:6px; border:1px solid var(--gray-200); background:var(--white); color:var(--gray-600); cursor:pointer;">Area</button>
+              <button id="exp-btn-bar"     onclick="setExplorerType('bar')"     style="font-size:11px; padding:5px 11px; border-radius:6px; border:1px solid var(--gray-200); background:var(--white); color:var(--gray-600); cursor:pointer;">Bar</button>
+              <button id="exp-btn-scatter" onclick="setExplorerType('scatter')" style="font-size:11px; padding:5px 11px; border-radius:6px; border:1px solid var(--gray-200); background:var(--white); color:var(--gray-600); cursor:pointer;">Scatter</button>
+              <button id="exp-btn-radar"   onclick="setExplorerType('radar')"   style="font-size:11px; padding:5px 11px; border-radius:6px; border:1px solid var(--gray-200); background:var(--white); color:var(--gray-600); cursor:pointer;">Radar</button>
+            </div>
+          </div>
+
+          <button onclick="runExplorerChart()" style="font-size:12px; padding:6px 16px; border-radius:6px; border:none; background:var(--blue-600,#2563eb); color:#fff; cursor:pointer; font-weight:600;">&#9654; Plot</button>
+        </div>
+
+        <div class="chart-wrap" style="height:300px"><canvas id="explorer-canvas"></canvas></div>
+        <div id="explorer-info" style="font-size:11px; color:var(--gray-400); margin-top:6px; text-align:center;"></div>
+      </div>
+      `;
     }
+
 
     if (d.patterns?.length) {
       html += `
@@ -2459,20 +2583,21 @@
     }
 
     document.getElementById('dash-main').innerHTML = html;
-    chartBlocks.forEach(c => {
-      try {
-        const canvas = document.getElementById(`cv-${c.id}`);
-        if (!canvas || !c.config) return;
-        
-        // Apply responsive animation config
-        c.config.options = c.config.options || {};
-        c.config.options.animation = { duration: 400 };
-        
-        activeCharts.push(new Chart(canvas, c.config));
-      } catch (e) { console.warn('Chart render failed:', c.id, e); }
-    });
 
-    // Removed inline sparkline generation
+    // Populate the Chart Explorer dropdowns now that DOM is ready
+    if (d.kpi_cards?.length) {
+      const selY = document.getElementById('explorer-y');
+      const selX = document.getElementById('explorer-x');
+      if (selY && selX) {
+        d.kpi_cards.forEach(k => {
+          selY.appendChild(Object.assign(document.createElement('option'), { value: k.key, textContent: k.label }));
+          selX.appendChild(Object.assign(document.createElement('option'), { value: k.key, textContent: k.label }));
+        });
+      }
+    }
+
+    // Render modern analytics charts
+    if (d.kpi_cards?.length) renderAnalyticsCharts(d);
     
     // Connect to WebSocket and subscribe for live updates
     initSocketConnection();
@@ -2490,6 +2615,410 @@
     
     // Show chat button
     document.getElementById('chat-widget-btn').style.display = 'flex';
+  }
+
+  function renderAnalyticsCharts(d) {
+    const kpis = d.kpi_cards || [];
+    if (!kpis.length) return;
+
+    const PALETTE = [
+      '#2563eb','#16a34a','#dc2626','#d97706','#7c3aed',
+      '#0891b2','#be185d','#65a30d','#9333ea','#b45309'
+    ];
+    const labels = kpis.map(k => k.label);
+
+    // ─────────────────────────────────────────────────────────────────
+    // Chart 1 – Multi-Sensor Timeline (normalized 0-100)
+    // ─────────────────────────────────────────────────────────────────
+    const tlCanvas = document.getElementById('analytics-timeline');
+    if (tlCanvas) {
+      const datasets = kpis.map((k, i) => {
+        const pts = (k.raw_data || []).slice(-40);
+        const range = (k.max - k.min) || 1;
+        const normalised = pts.map(p => Math.round((p[1] - k.min) / range * 100));
+        const xlabels   = pts.map(p => {
+          const d = new Date(p[0]);
+          return d.toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'});
+        });
+        return {
+          label: k.label,
+          data: normalised,
+          _xlabels: xlabels,
+          borderColor: PALETTE[i % PALETTE.length],
+          backgroundColor: PALETTE[i % PALETTE.length] + '18',
+          borderWidth: 2,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          fill: false,
+          tension: 0.35
+        };
+      });
+
+      // Use the longest x-axis labels set
+      const longest = datasets.reduce((a, b) => a._xlabels.length >= b._xlabels.length ? a : b, datasets[0]);
+
+      new Chart(tlCanvas.getContext('2d'), {
+        type: 'line',
+        data: { labels: longest._xlabels, datasets },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'top', labels: { boxWidth: 10, font: { size: 11 } } },
+            tooltip: {
+              callbacks: {
+                label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)}% of range`
+              }
+            }
+          },
+          scales: {
+            x: { grid: { color: '#f0f0f0' }, ticks: { font: { size: 10 }, maxTicksLimit: 10 } },
+            y: {
+              min: 0, max: 100,
+              title: { display: true, text: 'Normalised Value (%)', font: { size: 10 } },
+              grid: { color: '#f0f0f0' }, ticks: { font: { size: 10 } }
+            }
+          },
+          animation: { duration: 600 }
+        }
+      });
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // Chart 2 – Value Range Analysis (grouped bar: min / avg / max)
+    // ─────────────────────────────────────────────────────────────────
+    const rgCanvas = document.getElementById('analytics-range');
+    if (rgCanvas) {
+      new Chart(rgCanvas.getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            { label: 'Min',  data: kpis.map(k => k.min),  backgroundColor: '#60a5fa' },
+            { label: 'Avg',  data: kpis.map(k => k.avg),  backgroundColor: '#2563eb' },
+            { label: 'Max',  data: kpis.map(k => k.max),  backgroundColor: '#1e3a8a' }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { position: 'top', labels: { boxWidth: 10, font: { size: 11 } } } },
+          scales: {
+            x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+            y: { grid: { color: '#f0f0f0' }, ticks: { font: { size: 10 } } }
+          },
+          animation: { duration: 600 }
+        }
+      });
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // Chart 3 – Volatility Radar (Coefficient of Variation = std/avg)
+    // ─────────────────────────────────────────────────────────────────
+    const rdCanvas = document.getElementById('analytics-radar');
+    if (rdCanvas) {
+      const cvData = kpis.map(k => {
+        const cv = k.avg !== 0 ? Math.abs((k.std || 0) / k.avg * 100) : 0;
+        return parseFloat(cv.toFixed(2));
+      });
+      new Chart(rdCanvas.getContext('2d'), {
+        type: 'radar',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Volatility (CV %)',
+            data: cvData,
+            borderColor: '#7c3aed',
+            backgroundColor: '#7c3aed22',
+            borderWidth: 2,
+            pointBackgroundColor: '#7c3aed',
+            pointRadius: 3
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            r: {
+              beginAtZero: true,
+              ticks: { font: { size: 9 } },
+              pointLabels: { font: { size: 10 } },
+              grid: { color: '#e5e7eb' }
+            }
+          },
+          animation: { duration: 600 }
+        }
+      });
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // Chart 4 – Anomaly Distribution (horizontal bar)
+    // ─────────────────────────────────────────────────────────────────
+    const anCanvas = document.getElementById('analytics-anomaly');
+    if (anCanvas) {
+      const sorted = [...kpis].sort((a, b) => (b.anomaly_count || 0) - (a.anomaly_count || 0));
+      const anColors = sorted.map(k =>
+        (k.anomaly_count || 0) > 5 ? '#dc2626' :
+        (k.anomaly_count || 0) > 1 ? '#d97706' : '#16a34a'
+      );
+      new Chart(anCanvas.getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: sorted.map(k => k.label),
+          datasets: [{
+            label: 'Anomalies Detected',
+            data: sorted.map(k => k.anomaly_count || 0),
+            backgroundColor: anColors,
+            borderRadius: 4
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: {
+              beginAtZero: true,
+              grid: { color: '#f0f0f0' },
+              title: { display: true, text: 'Number of Anomalies', font: { size: 10 } },
+              ticks: { font: { size: 10 }, stepSize: 1 }
+            },
+            y: { grid: { display: false }, ticks: { font: { size: 10 } } }
+          },
+          animation: { duration: 600 }
+        }
+      });
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // Sensor Timelines – one card per sensor
+    // ─────────────────────────────────────────────────────────────────
+    const grid = document.getElementById('sensor-timelines-grid');
+    const badge = document.getElementById('sensor-timelines-count');
+    if (grid) {
+      grid.innerHTML = '';
+      const sensorsWithData = kpis.filter(k => k.raw_data && k.raw_data.length > 1);
+      if (badge) badge.textContent = sensorsWithData.length + ' sensors';
+
+      sensorsWithData.forEach((k, i) => {
+        const pts = k.raw_data;
+        const labels = pts.map(p => new Date(p[0]).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }));
+        const vals   = pts.map(p => p[1]);
+        const col    = PALETTE[i % PALETTE.length];
+
+        // Detect anomalies by simple IQR or by z-score > 2.5
+        const mean = vals.reduce((a,b) => a+b, 0) / vals.length;
+        const std  = Math.sqrt(vals.reduce((a,b) => a + (b-mean)**2, 0) / vals.length) || 1;
+        const pointColors = vals.map(v => Math.abs(v - mean) / std > 2.5 ? '#dc2626' : col);
+        const pointRadii  = vals.map(v => Math.abs(v - mean) / std > 2.5 ? 5 : (pts.length > 50 ? 0 : 2));
+
+        // Trend arrow
+        const trendIcon = k.trend === 'rising' ? '↑' : k.trend === 'falling' ? '↓' : '→';
+        const trendClr  = k.trend === 'rising' ? '#16a34a' : k.trend === 'falling' ? '#dc2626' : '#6b7280';
+
+        // Build card
+        const card = document.createElement('div');
+        card.className = 'chart-cell';
+        card.style.cssText = 'display:flex; flex-direction:column; gap:8px;';
+        card.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+            <div>
+              <div style="font-size:13px; font-weight:700; color:var(--gray-800);">${k.label}</div>
+              <div style="font-size:10px; color:var(--gray-400); margin-top:2px;">${pts.length} data points · ${k.unit || 'no unit'}</div>
+            </div>
+            <span style="font-size:13px; font-weight:700; color:${trendClr};">${trendIcon}</span>
+          </div>
+          <div style="display:flex; gap:12px; flex-wrap:wrap;">
+            <div style="display:flex; flex-direction:column;"><span style="font-size:9px;text-transform:uppercase;color:var(--gray-400);letter-spacing:.05em;">Avg</span><span style="font-size:13px;font-weight:600;color:var(--gray-700);">${fmtNum(k.avg)}${k.unit ? ' '+k.unit : ''}</span></div>
+            <div style="display:flex; flex-direction:column;"><span style="font-size:9px;text-transform:uppercase;color:var(--gray-400);letter-spacing:.05em;">Min</span><span style="font-size:12px;color:#3b82f6;">${fmtNum(k.min)}</span></div>
+            <div style="display:flex; flex-direction:column;"><span style="font-size:9px;text-transform:uppercase;color:var(--gray-400);letter-spacing:.05em;">Max</span><span style="font-size:12px;color:#ef4444;">${fmtNum(k.max)}</span></div>
+            ${k.anomaly_count > 0 ? `<div style="display:flex; flex-direction:column;"><span style="font-size:9px;text-transform:uppercase;color:var(--gray-400);letter-spacing:.05em;">Anomalies</span><span style="font-size:12px;color:#dc2626;font-weight:700;">${k.anomaly_count} ⚠</span></div>` : ''}
+          </div>
+          <div style="position:relative; height:130px;"><canvas id="tl-${k.key.replace(/[^a-z0-9]/gi,'_')}"></canvas></div>`;
+
+        grid.appendChild(card);
+
+        const canvasEl = card.querySelector('canvas');
+        if (canvasEl) {
+          new Chart(canvasEl.getContext('2d'), {
+            type: 'line',
+            data: {
+              labels,
+              datasets: [{
+                label: k.label,
+                data: vals,
+                borderColor: col,
+                backgroundColor: col + '18',
+                borderWidth: 1.5,
+                pointRadius: pointRadii,
+                pointBackgroundColor: pointColors,
+                fill: true,
+                tension: 0.3
+              }]
+            },
+            options: {
+              responsive: true, maintainAspectRatio: false,
+              plugins: {
+                legend: { display: false },
+                tooltip: {
+                  callbacks: {
+                    label: ctx => `${fmtNum(ctx.parsed.y)}${k.unit ? ' '+k.unit : ''}${
+                      Math.abs(ctx.parsed.y - mean) / std > 2.5 ? ' ⚠ anomaly' : ''
+                    }`
+                  }
+                }
+              },
+              scales: {
+                x: { grid: { display: false }, ticks: { font: { size: 9 }, maxTicksLimit: 6, color: '#9ca3af' } },
+                y: { grid: { color: '#f5f5f5' }, ticks: { font: { size: 9 }, color: '#9ca3af', maxTicksLimit: 4 } }
+              },
+              animation: { duration: 500 }
+            }
+          });
+        }
+      });
+    }
+    
+    // Auto-run the explorer with default selections
+    setTimeout(runExplorerChart, 100);
+  }
+
+  // ── Chart Explorer Logic ──────────────────────────────────────────
+  let explorerType = 'line';
+  let explorerChartInstance = null;
+
+  function setExplorerType(type) {
+    explorerType = type;
+    ['line','area','bar','scatter','radar'].forEach(t => {
+      const btn = document.getElementById(`exp-btn-${t}`);
+      if (btn) {
+        if (t === type) {
+          btn.style.background = 'var(--blue-50)';
+          btn.style.borderColor = 'var(--blue-600)';
+          btn.style.color = 'var(--blue-700)';
+          btn.style.fontWeight = '600';
+        } else {
+          btn.style.background = 'var(--white)';
+          btn.style.borderColor = 'var(--gray-200)';
+          btn.style.color = 'var(--gray-600)';
+          btn.style.fontWeight = '400';
+        }
+      }
+    });
+    if (explorerChartInstance) runExplorerChart();
+  }
+
+  function runExplorerChart() {
+    if (!lastGeneratedData || !lastGeneratedData.kpi_cards) return;
+    
+    const yKey = document.getElementById('explorer-y').value;
+    const xKey = document.getElementById('explorer-x').value;
+    
+    const yKpi = lastGeneratedData.kpi_cards.find(k => k.key === yKey);
+    const xKpi = xKey === '__time__' ? null : lastGeneratedData.kpi_cards.find(k => k.key === xKey);
+    
+    if (!yKpi || !yKpi.raw_data || yKpi.raw_data.length === 0) {
+      document.getElementById('explorer-info').textContent = 'No data available for the selected Y-axis variable.';
+      if (explorerChartInstance) { explorerChartInstance.destroy(); explorerChartInstance = null; }
+      return;
+    }
+
+    // Align data based on timestamps (assuming sorted raw_data [timestamp, value])
+    let labels = [];
+    let dataPts = [];
+    
+    if (xKey === '__time__') {
+      labels = yKpi.raw_data.map(p => new Date(p[0]).toLocaleString([], {month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit'}));
+      dataPts = yKpi.raw_data.map(p => p[1]);
+      document.getElementById('explorer-info').textContent = `${yKpi.label} over Time`;
+    } else {
+      if (!xKpi || !xKpi.raw_data || xKpi.raw_data.length === 0) {
+        document.getElementById('explorer-info').textContent = 'No data available for the selected X-axis variable.';
+        return;
+      }
+      // Create a map of X timestamps for fast lookup
+      const xMap = new Map();
+      xKpi.raw_data.forEach(p => xMap.set(p[0], p[1]));
+      
+      // Match Y points to X points
+      yKpi.raw_data.forEach(p => {
+        if (xMap.has(p[0])) {
+          if (explorerType === 'scatter' || explorerType === 'bubble') {
+            dataPts.push({ x: xMap.get(p[0]), y: p[1] });
+          } else {
+            labels.push(xMap.get(p[0]).toFixed(2));
+            dataPts.push(p[1]);
+          }
+        }
+      });
+      
+      // If point-to-point types (line/bar/area) sort by X axis so it draws correctly left-to-right
+      if (explorerType !== 'scatter' && labels.length > 0) {
+        const zipped = labels.map((l, i) => ({ l: parseFloat(l), d: dataPts[i] })).sort((a,b) => a.l - b.l);
+        labels = zipped.map(z => z.l.toString());
+        dataPts = zipped.map(z => z.d);
+      }
+      
+      document.getElementById('explorer-info').textContent = `${yKpi.label} vs ${xKpi.label} (${dataPts.length} intersecting points)`;
+    }
+
+    if (explorerChartInstance) explorerChartInstance.destroy();
+    
+    const ctx = document.getElementById('explorer-canvas').getContext('2d');
+    const isArea = explorerType === 'area';
+    const cType = isArea ? 'line' : explorerType;
+    
+    const ds = {
+      label: yKpi.label,
+      data: dataPts,
+      backgroundColor: isArea ? '#3b82f644' : '#3b82f6',
+      borderColor: '#3b82f6',
+      borderWidth: 2,
+      pointRadius: explorerType === 'scatter' ? 4 : Math.max(0, 3 - Math.floor(dataPts.length / 50)),
+      pointBackgroundColor: '#3b82f6',
+      fill: isArea,
+      tension: 0.3
+    };
+
+    const cfg = {
+      type: cType,
+      data: { labels: explorerType === 'scatter' ? null : labels, datasets: [ds] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: {
+            type: explorerType === 'scatter' ? 'linear' : 'category',
+            title: { display: true, text: xKey === '__time__' ? 'Time' : (xKpi ? xKpi.label : 'X'), font: { size: 11, weight: 'bold' } },
+            grid: { color: '#f5f5f5' },
+            ticks: { font: { size: 10 }, maxTicksLimit: explorerType === 'scatter' ? undefined : 15 }
+          },
+          y: {
+            title: { display: true, text: yKpi.label, font: { size: 11, weight: 'bold' } },
+            grid: { color: '#f0f0f0' },
+            ticks: { font: { size: 10 } }
+          }
+        },
+        animation: { duration: 400 }
+      }
+    };
+    
+    // Radar needs special scales
+    if (explorerType === 'radar') {
+      cfg.options.scales = { r: { grid: { color: '#f0f0f0' }, ticks: { font: { size: 10 } } } };
+    }
+
+    explorerChartInstance = new Chart(ctx, cfg);
+  }
+
+  function showToast(msg, type = 'warning') {
+    const t = document.createElement('div');
+    const bg = type === 'alert' ? '#dc2626' : '#d97706';
+    t.style.cssText = `position:fixed; bottom:24px; right:24px; z-index:9999; max-width:360px;
+      background:${bg}; color:#fff; padding:12px 16px; border-radius:8px;
+      font-size:13px; font-weight:500; box-shadow:0 4px 16px rgba(0,0,0,.25);
+      animation:fadeInUp .3s ease; line-height:1.4;`;
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity .4s'; setTimeout(() => t.remove(), 400); }, 4000);
   }
 
   function fmtNum(n) {
@@ -2515,43 +3044,6 @@
     activeCharts = [];
   }
 
-  function changeChartType(chartId, newType) {
-    const chart = activeCharts.find(c => c.canvas.id === 'cv-' + chartId);
-    if (!chart) return;
-
-    if (newType === 'area') {
-      chart.config.type = 'line';
-    } else {
-      chart.config.type = newType;
-    }
-
-    chart.config.data.datasets.forEach(ds => {
-      if (newType === 'line' || newType === 'scatter') {
-        ds.fill = false;
-        if (ds.backgroundColor && typeof ds.backgroundColor === 'string' && ds.backgroundColor.length >= 7) {
-          ds.backgroundColor = ds.backgroundColor.slice(0, 7) + '18';
-        }
-      } else if (newType === 'area') {
-        ds.fill = true;
-        if (ds.backgroundColor && typeof ds.backgroundColor === 'string' && ds.backgroundColor.length >= 7) {
-          ds.backgroundColor = ds.backgroundColor.slice(0, 7) + '44';
-        }
-      } else if (newType === 'bar' || newType === 'radar' || newType === 'polarArea') {
-        ds.fill = true;
-        if (ds.backgroundColor && typeof ds.backgroundColor === 'string' && ds.backgroundColor.length >= 7) {
-          ds.backgroundColor = ds.backgroundColor.slice(0, 7) + 'cc';
-        }
-      }
-    });
-
-    if (['pie', 'doughnut'].includes(newType)) {
-      if (chart.config.options) {
-        chart.config.options.cutout = newType === 'doughnut' ? '65%' : '0%';
-      }
-    }
-
-    chart.update();
-  }
 
   async function post(url, body) {
     return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -2578,33 +3070,6 @@
 
     // Attempt to merge back any user-edits into the config payload
     const dataToSave = JSON.parse(JSON.stringify(lastGeneratedData));
-    
-    // For chart js blocks, update the config and type
-    if (dataToSave.chart_blocks) {
-        dataToSave.chart_blocks.forEach(cb => {
-            if (cb.render_type === 'chartjs') {
-                const ac = activeCharts.find(c => c.canvas.id === 'cv-' + cb.id);
-                if (ac) {
-                    cb.chart_type = ac.config.type;
-                    if (cb.config) {
-                        cb.config.type = ac.config.type;
-                        if (cb.config.data && cb.config.data.datasets && ac.config.data && ac.config.data.datasets) {
-                            cb.config.data.datasets.forEach((ds, i) => {
-                                 const ads = ac.config.data.datasets[i];
-                                 if (ads) {
-                                     ds.fill = ads.fill;
-                                     ds.backgroundColor = ads.backgroundColor;
-                                 }
-                            });
-                        }
-                        if (['pie', 'doughnut'].includes(ac.config.type) && cb.config.options && ac.config.options) {
-                            cb.config.options.cutout = ac.config.options.cutout;
-                        }
-                    }
-                }
-            }
-        });
-    }
 
     try {
         const res = await post('/api/dashboards', { name: name, config: dataToSave });
@@ -2664,19 +3129,44 @@
         setTimeout(() => {
             element.style.height = originalHeight;
             element.style.overflow = originalOverflow;
-            if (btn) { btn.textContent = ' Export'; btn.disabled = false; }
+            if (btn) { btn.textContent = ' PDF'; btn.disabled = false; }
         }, 800);
     }).catch(err => {
         console.error('PDF Export error:', err);
         element.style.height = originalHeight;
         element.style.overflow = originalOverflow;
-        if (btn) { btn.textContent = ' Export'; btn.disabled = false; }
+        if (btn) { btn.textContent = ' PDF'; btn.disabled = false; }
         alert('Export failed: ' + err.message);
     });
   }
 
+  function exportCurrentDashboardCSV() {
+      if (!lastGeneratedData || !lastGeneratedData.kpi_cards) {
+          alert('No dashboard data to export yet.');
+          return;
+      }
+      
+      const rows = ['Metric,Timestamp,Value'];
+      lastGeneratedData.kpi_cards.forEach(k => {
+          (k.raw_data || []).forEach(p => {
+              rows.push(`"${k.label}",${new Date(p[0]).toISOString()},${p[1]}`);
+          });
+      });
+
+      const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+      const url  = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href  = url;
+      const deviceName = lastGeneratedData.device_name
+          ? lastGeneratedData.device_name.replace(/[^a-z0-9]/gi, '_') : 'dashboard';
+      link.download = `${deviceName}_data_${new Date().toLocaleDateString('en-GB').replace(/\//g, '-')}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+  }
+
   // Ensure a shared dashboard renders automatically on load
-  const isSharedDashboard = {% if shared_dashboard %}true{% else %}false{% endif %};
   if (isSharedDashboard) {
       document.addEventListener("DOMContentLoaded", () => {
           showScreen('dashboard');
