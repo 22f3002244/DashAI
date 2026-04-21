@@ -2527,6 +2527,10 @@
     const chart = activeCharts.find(c => c.canvas.id === 'cv-' + chartId);
     if (!chart) return;
 
+    // Detect if we are currently in scatter mode (data is {x,y} objects)
+    const wasScatter = chart.config.data.datasets.some(ds =>
+      Array.isArray(ds.data) && ds.data.length > 0 && typeof ds.data[0] === 'object' && ds.data[0] !== null && 'y' in ds.data[0]);
+
     if (newType === 'area') {
       chart.config.type = 'line';
     } else {
@@ -2537,6 +2541,17 @@
       // Override explicit dataset type so the chart type properly changes
       ds.type = (newType === 'area') ? 'line' : newType;
 
+      // ── Data format conversion for scatter ────────────────────────
+      // Scatter requires {x, y} objects; all other types use plain numbers.
+      if (newType === 'scatter' && !wasScatter) {
+        ds.data = ds.data.map((v, i) => ({ x: i, y: (typeof v === 'number' ? v : (v && v.y) || 0) }));
+        ds.pointRadius = 4;
+      } else if (newType !== 'scatter' && wasScatter) {
+        ds.data = ds.data.map(v => (v && typeof v === 'object' && 'y' in v) ? v.y : v);
+        ds.pointRadius = undefined; // restore default
+      }
+
+      // ── Colour / fill styling ─────────────────────────────────────
       if (newType === 'line' || newType === 'scatter') {
         ds.fill = false;
         if (ds.backgroundColor && typeof ds.backgroundColor === 'string' && ds.backgroundColor.length >= 7) {

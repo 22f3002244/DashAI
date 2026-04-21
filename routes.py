@@ -94,15 +94,30 @@ def api_login():
     password = d.get("password","").strip()
     token    = d.get("token","").strip()
 
+    # Strip 'Bearer ' prefix in case user accidentally copies the full header value
+    if token.lower().startswith("bearer "):
+        token = token[7:].strip()
+
     if not host: return jsonify({"error": "Please enter the server address."}), 400
     if not host.startswith("http"): host = "https://" + host
 
     try:
         if token:
-            r = requests.get(f"{host}/api/auth/user",
-                             headers={"X-Authorization": f"Bearer {token}"}, timeout=10)
+            # Try with SSL verification first; fall back without it for self-hosted servers
+            def _check_token(verify_ssl):
+                return requests.get(
+                    f"{host}/api/auth/user",
+                    headers={"X-Authorization": f"Bearer {token}"},
+                    timeout=10, verify=verify_ssl)
+            try:
+                r = _check_token(True)
+            except requests.exceptions.SSLError:
+                r = _check_token(False)
+
+            if r.status_code == 401:
+                return jsonify({"error": "Token rejected by ThingsBoard (expired or invalid). Please generate a fresh token."}), 401
             if r.status_code != 200:
-                return jsonify({"error": "Invalid token. Please check and try again."}), 401
+                return jsonify({"error": f"ThingsBoard returned HTTP {r.status_code} when validating token. Check the server URL."}), 401
             user = r.json()
             first = user.get("firstName") or ""
             last = user.get("lastName") or ""
@@ -111,8 +126,12 @@ def api_login():
                             "name": (first + " " + last).strip()})
         elif email and password:
             tok = tb_login(host, email, password)
-            r2  = requests.get(f"{host}/api/auth/user",
-                               headers={"X-Authorization": f"Bearer {tok}"}, timeout=10)
+            try:
+                r2 = requests.get(f"{host}/api/auth/user",
+                                   headers={"X-Authorization": f"Bearer {tok}"}, timeout=10)
+            except requests.exceptions.SSLError:
+                r2 = requests.get(f"{host}/api/auth/user",
+                                   headers={"X-Authorization": f"Bearer {tok}"}, timeout=10, verify=False)
             user = r2.json() if r2.status_code == 200 else {}
             first = user.get("firstName") or ""
             last = user.get("lastName") or ""
