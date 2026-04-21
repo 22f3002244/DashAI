@@ -240,6 +240,11 @@ def shared_dashboard(token):
         
     groq_configured = bool(GROQ_API_KEY and GROQ_API_KEY != "your_groq_api_key_here")
     
+    # Strip massive config from standard view payload to improve initial page HTML load speed
+    # We will fetch it asynchronously instead
+    if "config" in dashboard:
+        del dashboard["config"]
+    
     # Render the dashboard template but indicate it's a shared (read-only) view
     return render_template("dashboard.html",
                            time_ranges=TIME_RANGES,
@@ -247,6 +252,13 @@ def shared_dashboard(token):
                            groq_configured=groq_configured,
                            user_email=dashboard.get("owner_email", "Shared User"),
                            shared_dashboard=dashboard)
+
+@bp.route("/api/shared/<token>")
+def api_shared_dashboard(token):
+    dashboard = get_dashboard_by_token(token)
+    if not dashboard:
+        return jsonify({"error": "Dashboard not found."}), 404
+    return jsonify(dashboard)
 
 @bp.route("/api/chat", methods=["POST"])
 @login_required

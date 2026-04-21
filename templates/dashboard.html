@@ -2689,11 +2689,21 @@
   // Ensure a shared dashboard renders automatically on load
   const isSharedDashboard = {% if shared_dashboard %}true{% else %}false{% endif %};
   if (isSharedDashboard) {
-      document.addEventListener("DOMContentLoaded", () => {
+      document.addEventListener("DOMContentLoaded", async () => {
           showScreen('dashboard');
-          const shareDataStr = `{{ shared_dashboard.config | safe if shared_dashboard else '{}' }}`;
+          document.getElementById('dash-main').innerHTML = `
+            <div class="running-state">
+              <div class="running-glyph">◌</div>
+              <p>Loading shared dashboard...</p>
+            </div>`;
+            
           try {
-              const shareData = JSON.parse(shareDataStr);
+              // Fetch huge JSON payload asynchronously so the initial HTML is tiny and loads instantly
+              const res = await fetch(`/api/shared/{{ shared_dashboard.share_token if shared_dashboard else '' }}`);
+              if (!res.ok) throw new Error("Could not load dashboard data from server.");
+              const dashResp = await res.json();
+              
+              const shareData = typeof dashResp.config === 'string' ? JSON.parse(dashResp.config) : dashResp.config;
               S.deviceId = shareData.device_id || '';
               S.deviceName = shareData.device_name || '';
               document.getElementById('sid-name').textContent = shareData.device_name || 'Shared Dashboard';
@@ -2701,11 +2711,11 @@
               
               lastGeneratedData = shareData; // Attach payload so detailed modals can read raw_data
               
-              // Since rendering requires these elements to be empty first
               clearLog();
               renderDashboard(shareData, [], []);
           } catch (e) {
               console.error("Failed to parse shared dashboard config", e);
+              document.getElementById('dash-main').innerHTML = `<div class="notice error">Failed to load shared dashboard data.</div>`;
           }
       });
   }
