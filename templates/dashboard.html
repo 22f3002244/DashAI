@@ -1823,6 +1823,7 @@
     host: '', token: '',
     userName: '{{ user_name }}',
     deviceId: '', deviceName: '', timeRange: '24h',
+    cachedDevices: null
   };
 
   const PRESET_URLS = {};
@@ -1940,6 +1941,7 @@
       const data = await res.json();
       if (!res.ok) { showError('login-error', data.error || 'Login failed.'); return; }
       S.token = data.token;
+      S.cachedDevices = null;
       await loadDeviceScreen();
     } catch (e) {
       showError('login-error', 'Could not connect. Check your server address and internet connection.');
@@ -1950,12 +1952,18 @@
 
   async function loadDeviceScreen() {
     showScreen('device');
+    if (S.cachedDevices) {
+        renderDeviceList(S.cachedDevices);
+        return;
+    }
+    
     const select = document.getElementById('device-select');
     select.innerHTML = '<option value="">Loading your devices…</option>';
     try {
       const res = await post('/api/devices', { tb_host: S.host, token: S.token });
       const data = await res.json();
-      renderDeviceList(data.devices || []);
+      S.cachedDevices = data.devices || [];
+      renderDeviceList(S.cachedDevices);
       if (data.warning) document.getElementById('device-hint').textContent += ' — ' + data.warning;
     } catch (e) {
       select.innerHTML = '<option value="">Could not load devices</option>';
@@ -2526,6 +2534,9 @@
     }
 
     chart.config.data.datasets.forEach(ds => {
+      // Override explicit dataset type so the chart type properly changes
+      ds.type = (newType === 'area') ? 'line' : newType;
+
       if (newType === 'line' || newType === 'scatter') {
         ds.fill = false;
         if (ds.backgroundColor && typeof ds.backgroundColor === 'string' && ds.backgroundColor.length >= 7) {
