@@ -1,3 +1,4 @@
+import os
 import requests
 import json
 import secrets
@@ -382,7 +383,7 @@ def fetch_live_telemetry():
     for sid, info in list(active_sessions.items()):
         try:
             url = f"{info['host']}/api/plugins/telemetry/DEVICE/{info['device_id']}/values/timeseries"
-            r = requests.get(url, headers={"X-Authorization": f"Bearer {info['token']}"}, timeout=5)
+            r = requests.get(url, headers={"X-Authorization": f"Bearer {info['token']}"}, timeout=2)
             if r.status_code == 200:
                 data = r.json()
                 if data:
@@ -391,7 +392,12 @@ def fetch_live_telemetry():
             pass
 
 scheduler.add_job(fetch_live_telemetry, 'interval', seconds=3)
-scheduler.start()
+# Only start the scheduler in the actual worker process.
+# In debug mode, Werkzeug forks a reloader parent + child process;
+# without this guard, APScheduler starts twice and creates doubled
+# background threads that block the response queue (causing slow logout).
+if os.environ.get('WERKZEUG_RUN_MAIN') != 'false':
+    scheduler.start()
 
 def init_socketio(sio):
     global socketio_instance
