@@ -206,7 +206,10 @@ def api_dashboards():
         if not isinstance(config, str):
             config = json.dumps(config)
             
-        share_token = secrets.token_urlsafe(16)
+        # Reuse existing share token if dashboard is being updated, otherwise generate new one
+        existing = next((d for d in get_dashboards(session["user_id"]) if d["name"] == name), None)
+        share_token = existing["share_token"] if existing else secrets.token_urlsafe(16)
+        
         dashboard_id = save_dashboard(session["user_id"], name, config, share_token)
         
         return jsonify({
