@@ -1,0 +1,1576 @@
+================================================================================
+         DASH AI — COMPREHENSIVE TECHNICAL REPORT
+         AI-Powered Universal Data Intelligence & Dashboard Platform
+         Version: 1.0 (ThingsBoard Integration — Phase 1)
+         Date: April 2026
+================================================================================
+
+--------------------------------------------------------------------------------
+ABSTRACT
+--------------------------------------------------------------------------------
+
+Dash AI is an AI-powered analytics and dashboard platform that transforms raw
+machine data into interactive, personalized, and insight-rich visual dashboards
+without requiring any manual configuration from the user. In its current Phase 1
+implementation, the platform is purpose-built for IoT telemetry data sourced
+from ThingsBoard — an open-source IoT data management platform — as per the
+requirements of the commissioning organisation. However, the architectural
+philosophy and pipeline design of Dash AI are intentionally data-source-agnostic.
+The system is conceived as a general-purpose "any data, any source → AI
+dashboard" platform. Future phases envision support for local file uploads
+(CSV, Excel, JSON, SQLite), direct REST API integrations with cloud IoT
+platforms (AWS IoT, Azure IoT Hub, Google Cloud IoT Core), time-series
+databases (InfluxDB, TimescaleDB), third-party analytics services (Grafana,
+DataDog, New Relic), and industrial SCADA/MES systems. The abstraction
+layer introduced by the 4-agent pipeline ensures that a change in data source
+requires only replacing Agent 1 (the DataFetcher), while the analytical,
+visualisation, and presentation layers remain entirely unchanged.
+
+--------------------------------------------------------------------------------
+TABLE OF CONTENTS
+--------------------------------------------------------------------------------
+
+ 1.  Introduction & Motivation
+ 2.  System Architecture
+     2.1  Layered Architecture Overview
+     2.2  Component Diagram
+     2.3  Agent Pipeline Architecture
+     2.4  Data Flow Architecture
+ 3.  Current Implementation: ThingsBoard Integration (Phase 1)
+ 4.  Broader Platform Vision: Universal Data Intelligence
+     4.1  Data Source Abstraction Layer
+     4.2  Phase 2: Local File Upload Mode
+     4.3  Phase 3: Multi-Platform Cloud API Integration
+     4.4  Phase 4: Third-Party & Indirect Data Sources
+     4.5  Phase 5: Enterprise & Industrial Data Sources
+ 5.  Literature Survey
+     5.1  IoT Data Management & Platforms
+     5.2  AI/ML for Automated Data Visualisation
+     5.3  Large Language Models in Analytics
+     5.4  Dashboard Generation & NLP-to-Chart Systems
+     5.5  Anomaly Detection in Time-Series Data
+     5.6  Real-Time Data Streaming
+ 6.  Technology Stack
+ 7.  Project File Structure
+ 8.  Detailed Module Analysis
+     8.1  Configuration (config.py)
+     8.2  Database Layer (database.py)
+     8.3  Pipeline Orchestrator (pipeline.py)
+     8.4  Agent 1: Data Fetcher
+     8.5  Agent 2: Data Cleaner
+     8.6  Agent 3: Viz Recommender
+     8.7  Agent 4: Dashboard Builder
+     8.8  HTTP Routes (routes.py)
+     8.9  Frontend Application (dashboard.html)
+     8.10 Supporting Templates
+ 9.  End-to-End Data Flow (Current)
+10.  Security Architecture
+11.  Deployment Architecture
+12.  Known Issues & Limitations
+13.  Future Roadmap
+14.  References
+
+================================================================================
+1. INTRODUCTION & MOTIVATION
+================================================================================
+
+The exponential growth of connected devices, cloud services, and data-generating
+systems has made "data" ubiquitous. Every organisation — from a smart-factory
+running 10,000 sensors to a researcher analysing a local CSV export — generates
+data that contains insights waiting to be discovered. Yet the gap between raw
+data and actionable insight remains enormous.
+
+Traditional BI tools (Tableau, Power BI, Grafana, Metabase) require significant
+manual effort: selecting chart types, choosing aggregations, configuring axes,
+creating calculated fields, and arranging layouts. Even for a skilled analyst,
+building a useful dashboard from a new dataset takes hours. For non-technical
+users, it is often impossible.
+
+Dash AI addresses this problem through a principle it calls Zero-Config
+Intelligence: a user supplies only three things — (1) a data source, (2)
+credentials to access it, and (3) the time window of interest. The system
+handles everything else automatically, delivering a complete, insightful,
+and interactive dashboard in under 60 seconds.
+
+The motivation for the platform comes from three observations:
+
+  1. DATA SOURCE DIVERSITY: Modern organisations use dozens of data systems.
+     A single platform that can ingest data from any source — IoT platforms,
+     cloud databases, local files, or third-party APIs — provides dramatically
+     more value than one locked to a single vendor.
+
+  2. LLM CAPABILITY: The emergence of powerful instruction-following language
+     models (GPT-4, Mixtral, LLaMA) makes it possible for software to reason
+     about data the way a skilled analyst would: understanding what a "temperature"
+     sensor should look like, what chart is best for boolean on/off states, and
+     what correlations between sensors are worth noting.
+
+  3. REAL-TIME EXPECTATIONS: Modern users expect dashboards to be live. The
+     ability to stream telemetry updates to an already-rendered dashboard via
+     WebSockets — without a page refresh — is now a baseline expectation for
+     any monitoring application.
+
+Phase 1 of Dash AI implements this vision for ThingsBoard-hosted IoT data,
+as required by the commissioning organisation. The architecture is deliberately
+designed to make Phase 2 onwards (described in Section 4) a matter of adding
+data-source adapters, not redesigning the system.
+
+================================================================================
+2. SYSTEM ARCHITECTURE
+================================================================================
+
+2.1  LAYERED ARCHITECTURE OVERVIEW
+-------------------------------------------------------
+
+Dash AI is structured in five horizontal layers:
+
+  ┌──────────────────────────────────────────────────────────────┐
+  │  LAYER 5: PRESENTATION LAYER                                  │
+  │  Jinja2 Templates · Chart.js · Socket.IO Client · html2pdf   │
+  │  Vanilla JS SPA (3-screen: Connect → Device → Dashboard)     │
+  └──────────────────────────────────────────────────────────────┘
+             ▲ JSON / HTML / WebSocket
+  ┌──────────────────────────────────────────────────────────────┐
+  │  LAYER 4: API & ROUTING LAYER                                 │
+  │  Flask Blueprint · REST Endpoints · Socket.IO Server          │
+  │  Session Auth · Login Required Decorator · APScheduler        │
+  └──────────────────────────────────────────────────────────────┘
+             ▲ AgentState dict
+  ┌──────────────────────────────────────────────────────────────┐
+  │  LAYER 3: AI INTELLIGENCE PIPELINE                            │
+  │  Agent 1: DataFetcher  (source-specific, replaceable)         │
+  │  Agent 2: DataCleaner  (universal statistical analysis)       │
+  │  Agent 3: VizRecommender (LLM-based chart selection)          │
+  │  Agent 4: DashboardBuilder (Chart.js config assembly)         │
+  └──────────────────────────────────────────────────────────────┘
+             ▲ raw_data dict
+  ┌──────────────────────────────────────────────────────────────┐
+  │  LAYER 2: DATA SOURCE LAYER (currently: ThingsBoard)          │
+  │  REST API Client · SSL Fallback · Multi-Device Support        │
+  │  [FUTURE: CSV/Excel · InfluxDB · AWS IoT · MQTT · etc.]      │
+  └──────────────────────────────────────────────────────────────┘
+             ▲ credentials / file / connection string
+  ┌──────────────────────────────────────────────────────────────┐
+  │  LAYER 1: PERSISTENCE & CONFIGURATION LAYER                   │
+  │  PostgreSQL (Neon) / SQLite · .env config · Render deployment │
+  └──────────────────────────────────────────────────────────────┘
+
+
+2.2  COMPONENT DIAGRAM
+-------------------------------------------------------
+
+  [Browser]
+      │
+      │  HTTPS / WSS
+      │
+  [Flask App — app.py]
+      │
+      ├──[Blueprint: routes.py]─────────────────────────┐
+      │        │                                         │
+      │   HTTP Routes                          Socket.IO Events
+      │        │                                         │
+      │   /run endpoint                    subscribe_telemetry
+      │        │                           disconnect/connect
+      │        ▼
+      │  [Pipeline Orchestrator — pipeline.py]
+      │        │
+      │        ├──[Agent 1: data_fetcher.py]
+      │        │       └── requests → ThingsBoard REST API
+      │        │                     (or future: local file parser,
+      │        │                      InfluxDB client, AWS SDK, etc.)
+      │        │
+      │        ├──[Agent 2: data_cleaner.py]
+      │        │       └── Pure Python stats + Groq API (optional)
+      │        │
+      │        ├──[Agent 3: viz_recommender.py]
+      │        │       └── Groq API (Mixtral-8x7b) or fallback
+      │        │
+      │        └──[Agent 4: dashboard_builder.py]
+      │                └── Pure Python Chart.js config assembly
+      │
+      ├──[database.py]
+      │       ├── PostgreSQL (Neon, production)
+      │       └── SQLite (local, development)
+      │
+      └──[APScheduler Background Thread]
+              └── fetch_live_telemetry() every 3s
+                      └── requests → ThingsBoard REST API
+
+
+2.3  AGENT PIPELINE ARCHITECTURE
+-------------------------------------------------------
+
+The pipeline follows an Chain-of-Responsibility / Blackboard pattern.
+A single shared state object (AgentState TypedDict) is passed sequentially
+through all four agents. Each agent reads from the state, enriches it, and
+returns the modified state. No inter-agent communication channels are needed.
+
+  INPUT
+  ┌─────────────────────────────────────────────────────────────┐
+  │  tb_host · tb_token · device_id · time_range                │
+  └─────────────────────────────────────────────────────────────┘
+        │
+        ▼
+  ┌─────────────────────────────────────────────────────────────┐
+  │  AGENT 1: DataFetcher                                        │
+  │  ─────────────────────────────────────────────────────────  │
+  │  Reads:  tb_host, tb_token, device_id, time_range           │
+  │  Writes: raw_data { telemetry, attributes, device metadata } │
+  │  Status: running → done | error                              │
+  └─────────────────────────────────────────────────────────────┘
+        │  raw_data
+        ▼
+  ┌─────────────────────────────────────────────────────────────┐
+  │  AGENT 2: DataCleaner                                        │
+  │  ─────────────────────────────────────────────────────────  │
+  │  Reads:  raw_data                                            │
+  │  Writes: cleaned_data { numeric, boolean, string, stats }   │
+  │          patterns [ trend, anomaly, constant, categorical,  │
+  │                     correlation (AI-assisted if configured) ]│
+  │  Status: running → done | error | skipped                    │
+  └─────────────────────────────────────────────────────────────┘
+        │  cleaned_data + patterns
+        ▼
+  ┌─────────────────────────────────────────────────────────────┐
+  │  AGENT 3: VizRecommender                                     │
+  │  ─────────────────────────────────────────────────────────  │
+  │  Reads:  cleaned_data, patterns, raw_data (device context)  │
+  │  Writes: viz_recommendations [ { id, title, type, keys,     │
+  │                                   description, priority } ] │
+  │  Calls:  Groq Mixtral-8x7b or _fallback_viz()               │
+  │  Status: running → done (never errors, fallback used)        │
+  └─────────────────────────────────────────────────────────────┘
+        │  viz_recommendations
+        ▼
+  ┌─────────────────────────────────────────────────────────────┐
+  │  AGENT 4: DashboardBuilder                                   │
+  │  ─────────────────────────────────────────────────────────  │
+  │  Reads:  cleaned_data, viz_recommendations, patterns         │
+  │  Writes: dashboard_data { kpi_cards, bool_cards,            │
+  │                            chart_blocks (Chart.js configs), │
+  │                            attr_table, patterns, summary }  │
+  │  Status: running → done | error                              │
+  └─────────────────────────────────────────────────────────────┘
+        │  dashboard_data
+        ▼
+  OUTPUT: Complete, renderable dashboard JSON
+
+
+2.4  DATA FLOW ARCHITECTURE
+-------------------------------------------------------
+
+The following describes the high-level data flow for a standard "Generate
+Dashboard" request, from the moment the user clicks the button to when charts
+appear on screen:
+
+  [Browser] POST /run
+        │ { tb_host, tb_token, device_id, time_range }
+        ▼
+  [Flask /run endpoint]
+        │ calls pipeline.run_pipeline()
+        │
+        ├── [DB] INSERT session record
+        │
+        ├── [DataFetcher]
+        │       GET {tb_host}/api/device/{id}              → device name/type
+        │       GET {tb_host}/api/.../keys/timeseries      → available keys
+        │       GET {tb_host}/api/.../values/timeseries    → historical data
+        │       GET {tb_host}/api/.../values/attributes    → device settings
+        │       [DB] INSERT agent_log entries (per step)
+        │
+        ├── [DataCleaner]
+        │       Pure Python statistics computation
+        │       POST api.groq.com (optional, llama-3.1-8b) → correlations
+        │       [DB] INSERT agent_log entries
+        │
+        ├── [VizRecommender]
+        │       POST api.groq.com (mixtral-8x7b-32768)    → chart selection
+        │       [fallback if Groq unavailable]
+        │       [DB] INSERT agent_log entries
+        │
+        └── [DashboardBuilder]
+                Pure Python Chart.js config construction
+                [DB] INSERT agent_log entries
+        │
+  [Flask /run] returns dashboard_data JSON
+        │
+  [Browser]
+        │
+        ├── GET /logs/{session_id}   → populate activity log sidebar
+        ├── renderDashboard(d)       → build HTML + instantiate Chart.js
+        └── socket.emit('subscribe_telemetry') → connect WebSocket feed
+
+  Then every 3 seconds:
+  [APScheduler background thread]
+        └── GET {tb_host}/api/.../values/timeseries (latest values)
+               → socketio.emit('telemetry_update', data, to=sid)
+                      → [Browser] handleLiveTelemetry()
+                             → chart.update('none') + appendLog()
+
+
+================================================================================
+3. CURRENT IMPLEMENTATION: THINGSBOARD INTEGRATION (PHASE 1)
+================================================================================
+
+In Phase 1, Dash AI is implemented as a dedicated analytics companion for
+ThingsBoard — the leading open-source IoT device management and data collection
+platform. This decision was driven by the commissioning organisation's existing
+ThingsBoard infrastructure and the requirement to deliver a production-ready
+product quickly.
+
+ThingsBoard provides a REST API that Dash AI uses exclusively via the
+requests library. The integration supports:
+
+  Authentication modes:
+    - Email + Password: POST /api/auth/login → JWT token
+    - Direct JWT paste: GET /api/auth/user validation
+    - SSL fallback: requests.exceptions.SSLError → retry with verify=False
+      (for self-hosted servers without valid certificates)
+
+  ThingsBoard deployment types supported:
+    - ThingsBoard Cloud      (thingsboard.cloud)
+    - ThingsBoard Demo       (demo.thingsboard.io — public demo)
+    - Self-hosted Community  (user-provided URL)
+    - Professional Edition   (PE/Edge, user-provided URL)
+
+  Account tier compatibility:
+    - Tenant administrators: /api/tenant/devices
+    - Customer users: /api/customer/{customerId}/devices
+
+  Data retrieval:
+    - Up to 20 telemetry keys per device (API batch limit)
+    - Up to 1,000 data points per key per request
+    - Time-range bounded (startTs/endTs in Unix milliseconds)
+    - Aggregation mode: NONE (raw values, no server-side averaging)
+    - Attribute scopes: client, server, shared (all three fetched)
+
+  Multi-device mode:
+    - device_id field accepts comma-separated UUIDs
+    - Results merged with "DeviceName - " key prefix
+    - Combined summary: device names joined, types de-duplicated
+
+  Live telemetry:
+    - /api/plugins/telemetry/DEVICE/{id}/values/timeseries (latest only)
+    - Polled every 3 seconds via APScheduler background thread
+    - Delivered to browser via Socket.IO WebSocket
+
+The ThingsBoard-specific code is entirely confined to:
+  agents/data_fetcher.py   (data acquisition)
+  routes.py :: api_login() (ThingsBoard JWT authentication)
+  routes.py :: api_devices() (ThingsBoard device listing)
+  routes.py :: fetch_live_telemetry() (ThingsBoard live poll)
+
+Everything else in the system (DataCleaner, VizRecommender, DashboardBuilder,
+the entire frontend, the database layer, the auth system) is agnostic to the
+data source.
+
+
+================================================================================
+4. BROADER PLATFORM VISION: UNIVERSAL DATA INTELLIGENCE
+================================================================================
+
+The fundamental value proposition of Dash AI is not "ThingsBoard analytics".
+It is: "Give us any structured time-series or tabular data, and we will
+automatically generate the best possible dashboard for it."
+
+ThingsBoard is Phase 1. The architecture was explicitly designed so that
+adding a new data source requires only:
+  1. Writing a new data_fetcher variant (implementing the same raw_data
+     output format)
+  2. Optionally extending the Connect UI (Screen 1) to collect the
+     relevant credentials or file selection
+  3. No changes to DataCleaner, VizRecommender, DashboardBuilder, or
+     the frontend rendering engine
+
+The raw_data contract that Agent 1 must produce is:
+  {
+    "device_id":      str or identifier,
+    "device_name":    str (display name),
+    "device_type":    str (optional category),
+    "time_range":     str (range key),
+    "time_range_label": str (human label),
+    "start_ts":       int (Unix ms),
+    "end_ts":         int (Unix ms),
+    "telemetry_keys": [str],         # ordered list of variable names
+    "attribute_keys": [str],         # metadata field names
+    "telemetry": {
+        "key_name": [{ "ts": int, "value": any }, ...]
+    },
+    "attributes": {
+        "key_name": { "value": any, "scope": str, "lastUpdateTs": int }
+    },
+    "fetched_at": str (ISO 8601)
+  }
+
+Any data source that can produce this structure — regardless of where the
+data comes from — will work with the full Dash AI pipeline instantly.
+
+
+4.1  DATA SOURCE ABSTRACTION LAYER
+-------------------------------------------------------
+
+The abstraction layer is the raw_data dictionary contract above. All four
+agents communicate exclusively through the AgentState TypedDict. No agent
+below Agent 1 ever knows or cares where the data came from.
+
+This mirrors the Adapter design pattern: each data source is an adapter that
+translates its native format into the universal raw_data schema.
+
+Planned adapters:
+  [Phase 1] ThingsBoard REST API       ← CURRENT (IMPLEMENTED)
+  [Phase 2] Local file upload (CSV, Excel, JSON, Parquet)
+  [Phase 3] InfluxDB / TimescaleDB (direct query)
+  [Phase 3] AWS IoT Core / SiteWise
+  [Phase 3] Azure IoT Hub
+  [Phase 3] Google Cloud IoT Core
+  [Phase 4] MQTT broker (Mosquitto, HiveMQ, EMQX)
+  [Phase 4] OPC-UA (industrial protocol)
+  [Phase 4] Grafana data source proxy
+  [Phase 4] Third-party REST APIs (user-defined URL + key mapping)
+  [Phase 5] SQL databases (PostgreSQL, MySQL, SQL Server)
+  [Phase 5] Splunk, DataDog, New Relic
+
+
+4.2  PHASE 2: LOCAL FILE UPLOAD MODE
+-------------------------------------------------------
+
+The most immediately impactful extension after ThingsBoard is allowing users
+to simply upload a file from their local computer.
+
+Supported formats planned:
+  CSV / TSV: Each column = one sensor/variable. One column must be a timestamp.
+             The file is parsed with Python's csv module or pandas.
+             Column type detection reuses DataCleaner's _classify() function.
+  Excel (.xlsx, .xls): Parsed with openpyxl or xlrd. Each sheet can be
+             a separate "device" in multi-device mode.
+  JSON: A flat list of records { "timestamp": ..., "sensor": value } or
+        a dict of lists { "sensor": [{ "ts": ..., "value": ... }] }.
+  Parquet: Analytical format common in data engineering pipelines.
+  SQLite (.db): The user uploads a database file; the system discovers
+             tables and lets the user choose which to analyse.
+
+UI changes required:
+  Screen 1 "Connect" would add a third mode tab:
+    "ThingsBoard" | "Cloud API" | "Upload File"
+  In Upload File mode, a drag-and-drop zone replaces the server URL inputs.
+  The selected file is POSTed to a new /api/upload endpoint.
+
+Backend:
+  A new agent_file_fetcher.py adapter reads the file, detects the timestamp
+  column automatically (ISO 8601, Unix epoch, Excel serial date), and
+  constructs the raw_data dict. Column name heuristics (same _unit() function
+  from DataCleaner) auto-assign units.
+
+This mode requires no external server. The entire pipeline runs locally.
+This makes Dash AI useful for data scientists, students, and researchers who
+have no IoT platform but have exported data as CSVs.
+
+
+4.3  PHASE 3: MULTI-PLATFORM CLOUD API INTEGRATION
+-------------------------------------------------------
+
+The second major expansion connects Dash AI directly to other cloud IoT and
+time-series data platforms.
+
+AWS IoT SiteWise:
+  - Authenticate via AWS credentials (access key + secret or IAM role)
+  - Use boto3 (AWS SDK) to list assets and asset properties
+  - Fetch time-series data via get_asset_property_value_history()
+  - Adapter translates AssetProperty → telemetry key, TimeSeries entry → {ts, value}
+
+Azure IoT Hub:
+  - Authenticate via connection string or EntraID (OAuth2)
+  - Use azure-iot-hub SDK to list devices and query Digital Twin properties
+  - Fetch telemetry from Azure Time Series Insights or Azure Data Explorer
+
+Google Cloud IoT Core / Pub/Sub:
+  - Authenticate via service account JSON
+  - Fetch historical data from Cloud Bigtable or BigQuery tables
+  - Map project/registry/device hierarchy to Dash AI's device model
+
+InfluxDB (v2/v3):
+  - Connect via InfluxDB client library (influxdb-client-python)
+  - Execute Flux queries to retrieve measurements and fields
+  - Each InfluxDB "measurement" = device_name, each "field" = telemetry key
+  - Supports both cloud (InfluxDB Cloud) and self-hosted instances
+
+TimescaleDB:
+  - Connect via psycopg2 (already in requirements)
+  - User provides connection string + table name + timestamp column
+  - SQL SELECT with time-range WHERE clause builds the raw dataset
+
+The UI for these sources would provide platform-specific credential forms,
+with documentation links and tooltips explaining where to find each value.
+
+
+4.4  PHASE 4: THIRD-PARTY & INDIRECT DATA SOURCES
+-------------------------------------------------------
+
+Beyond direct API integrations, Dash AI is designed to support indirect
+data access via:
+
+Generic REST API mode:
+  The user specifies:
+    - Base URL
+    - Authentication header format (Bearer token, API key, Basic)
+    - The JSON path to the data array (e.g. "data.readings")
+    - The timestamp field name and the value field names
+  Dash AI constructs the HTTP request, fetches data, and applies a JSONPath
+  extractor to build the raw_data dict. This enables connecting to any
+  REST-based IoT or monitoring system without writing a custom adapter.
+
+Webhook / Push mode:
+  Instead of Dash AI pulling data, external systems push data to a
+  Dash AI webhook endpoint (/api/ingest/{device_token}). Incoming payloads
+  are buffered and immediately available for dashboard generation.
+
+MQTT subscriber:
+  Dash AI connects to an MQTT broker (user provides host, port, topic pattern,
+  TLS cert if needed), listens for a configurable time window, and collects
+  all messages as the dataset. This is ideal for IoT installations that don't
+  use a full platform like ThingsBoard, preferring raw MQTT.
+
+File sync from cloud storage:
+  The user provides credentials to AWS S3, Azure Blob Storage, or Google
+  Cloud Storage. Dash AI downloads the latest CSV/Parquet export from the
+  bucket and processes it as a local file. This is common in industrial IoT
+  where historians export data on a schedule to object storage.
+
+
+4.5  PHASE 5: ENTERPRISE & INDUSTRIAL DATA SOURCES
+-------------------------------------------------------
+
+For large-scale enterprise deployments:
+
+OPC-UA:
+  The OPC Unified Architecture is the dominant protocol in industrial
+  automation (SCADA, PLC, DCS systems). A Dash AI OPC-UA adapter using the
+  opcua-asyncio or asyncua library can browse node trees, read historical
+  values via HDA (Historical Data Access), and feed them into the pipeline.
+  This enables Dash AI to create dashboards directly from Siemens, ABB,
+  Rockwell, and Honeywell industrial systems.
+
+SQL databases (general):
+  The user provides a connection string (SQLAlchemy DSN) and either writes a
+  simple SELECT query or uses a visual column-picker UI. The result set is
+  treated as tabular telemetry data. This enables Dash AI to work with any
+  well-structured relational database that stores time-series measurements.
+
+DataDog / New Relic / Splunk:
+  These are observability platforms used in IT/DevOps. Dash AI could fetch
+  metric time-series (CPU, memory, request latency, error rates) via their
+  respective APIs and render them as dashboards, effectively becoming a
+  zero-config observability dashboard layer on top of existing monitoring stacks.
+
+Data marketplace APIs:
+  Public datasets (weather, financial markets, environmental sensors, satellite
+  readings) available via standard REST APIs can be ingested through the
+  generic REST mode, allowing Dash AI to serve research and public data
+  visualisation use cases.
+
+In all cases above, the output is identical: a Dash AI personalized dashboard
+rendered in the browser, saveable, shareable, and conversationally queryable
+via the AI chat widget. The user never needs to know or care what system
+provided the underlying data.
+
+
+================================================================================
+5. LITERATURE SURVEY
+================================================================================
+
+This section surveys key academic and industry work relevant to the core
+capabilities of Dash AI: IoT data management, automated visualisation,
+LLM-based analytics, anomaly detection, and real-time streaming.
+
+
+5.1  IoT DATA MANAGEMENT & PLATFORMS
+-------------------------------------------------------
+
+The Internet of Things (IoT) has grown to encompass an estimated 15+ billion
+connected devices globally as of 2024 (Statista, 2024), generating unprecedented
+volumes of time-series telemetry data. Managing, storing, querying, and
+visualising this data has become a central challenge in computer science and
+systems engineering.
+
+Botta et al. (2016) classified IoT Cloud platforms along dimensions of service
+model (IaaS, PaaS, SaaS), data model, and API design, noting that the lack of
+interoperability between platforms was a key obstacle to IoT adoption. This
+observation directly motivates Dash AI's data-source-agnostic design: by
+presenting a unified interface over heterogeneous backends, the platform
+resolves the interoperability problem at the analytics layer.
+
+ThingsBoard specifically implements the Actor Model (Lightbend Akka) for
+device message processing and uses Cassandra or PostgreSQL for time-series
+storage, providing sub-second write latency at scale (ThingsBoard Technical
+Documentation, 2023). Dash AI connects to ThingsBoard's REST API, which
+exposes this data in a universally accessible JSON format.
+
+AWS IoT SiteWise (2021) and Azure IoT Hub (2017) represent the cloud-native
+enterprise IoT management tier, providing proprietary data models and APIs
+that become accessible via Dash AI's Phase 3 adapters. Ngu et al. (2017)
+provide a comprehensive structured survey of IoT middleware platforms,
+confirming the diversity of API paradigms and reinforcing the need for
+an abstraction layer such as Dash AI's DataFetcher interface.
+
+
+5.2  AI/ML FOR AUTOMATED DATA VISUALISATION
+-------------------------------------------------------
+
+Automated visualisation generation has been studied in the data visualisation
+community for over two decades. Mackinlay (1986) introduced APT (A Presentation
+Tool), which formalised the selection of graphical encodings based on data
+types and perceptual effectiveness principles. This foundational work
+established that the best chart type for a dataset can, in principle, be
+determined algorithmically.
+
+Wongsuphasawat et al. (2016) presented Voyager, a system that recommends
+visualisations by scoring combinations of fields and chart types using a
+formal perceptual effectiveness model. Voyager's graphical mark selection
+logic (point for scatter, line for time, bar for categorical) is echoed in
+Dash AI's VizRecommender agent's fallback mode and in the constraints encoded
+in the Groq system prompt.
+
+The VizML project (Hu et al., 2019) collected 31 million real-world plotly
+charts and trained a classifier to predict chart types from dataset features
+(cardinality, monotonicity, data type). Dash AI takes a related but different
+approach: it delegates this prediction to a large language model that has
+been trained on vast corpora including data science literature, documentation,
+and chart-data pairs, enabling zero-shot generalisation to new sensor types
+without any training data.
+
+NL4DV (Narechania et al., 2021) introduced a natural language interface for
+generating Vega-Lite visualisations from text queries. Dash AI's conversational
+chat widget (Section 8.9) extends this concept beyond chart generation to
+natural language Q&A over the data, using the dashboard's pre-computed
+statistics as grounding context.
+
+
+5.3  LARGE LANGUAGE MODELS IN ANALYTICS
+-------------------------------------------------------
+
+The application of large language models (LLMs) to structured data analysis
+is a rapidly evolving field. OpenAI's GPT-4 (OpenAI, 2023) demonstrated that
+transformer models can reason over tabular data, write SQL queries, generate
+Python data analysis code, and interpret descriptive statistics.
+
+Cheng et al. (2023) introduced "Is Your LLM Secretly a World Model?" which
+showed that LLMs encode implicit knowledge about sensor physics, domain norms,
+and causal relationships — making them particularly suited to IoT analytics
+where sensor context (a "temperature" sensor should be between -40°C and
+150°C; a "battery" should be between 0% and 100%) improves interpretation
+quality significantly.
+
+Dash AI exploits this implicit world knowledge in two places:
+  1. VizRecommender: The Groq system prompt instructs the LLM to select chart
+     types based on sensor semantics, not just data types. The model knows that
+     CO2 concentration benefits from a trend line, that boolean on/off status
+     is best shown as a doughnut, and that correlated sensors may be best
+     compared in a scatter plot.
+  2. Chat widget: The llama-3.1-8b-instant model is grounded with precise
+     statistics (mean, min, max with timestamps, trend, anomaly count) and can
+     answer natural language questions like "when was the peak temperature?" or
+     "is the humidity trending towards dangerous levels?" accurately.
+
+Ma et al. (2023) proposed "Large Language Models as Tool Makers", demonstrating
+that LLMs can produce executable code that processes structured data. Dash AI's
+DashboardBuilder agent takes a complementary approach, generating Chart.js
+configuration objects (JSON) rather than Python code, which the browser executes
+directly. This sidesteps the sandboxing concerns of LLM-generated code while
+achieving the same personalisation effect.
+
+The choice of Groq as the inference provider (rather than OpenAI or Anthropic)
+is driven by Groq's industry-leading inference speed: up to 500 tokens/second
+on LPU hardware (Groq, 2024), making the sub-second latency VizRecommender
+response a realistic product experience rather than a research prototype.
+
+
+5.4  DASHBOARD GENERATION & NLP-TO-CHART SYSTEMS
+-------------------------------------------------------
+
+Several systems have explored the pipeline from raw data to dashboard, each
+with different assumptions and trade-offs:
+
+  Grafana (Grafana Labs, 2014–present):
+    The dominant open-source monitoring dashboard platform. Grafana requires
+    users to manually configure every panel: select data source, write query,
+    choose chart type, set axes. Dash AI's value proposition is the elimination
+    of this manual configuration step.
+
+  Kibana (Elastic, 2013–present):
+    Elasticsearch's visualisation layer, offering auto-suggest for field names
+    but still requiring manual chart assembly. While Elastic Lens (introduced
+    2020) automates some chart recommendations, it is bound to Elasticsearch
+    as a data source.
+
+  Google Looker Studio (formerly Data Studio):
+    Provides template-based dashboards and some chart suggestions, but still
+    requires the user to select fields and chart types. No AI pipeline.
+
+  Chat2DB (GitHub, 2023):
+    An LLM-powered SQL query assistant that generates SQL from natural language
+    and renders results as charts. Similar in spirit to Dash AI's chat widget
+    but focused on relational databases rather than time-series telemetry.
+
+  AutoViz (Bokeh-based, 2020):
+    A Python library that automatically generates visualisations for a DataFrame.
+    It uses rule-based heuristics (data type + cardinality) to select chart
+    types. Dash AI's VizRecommender goes beyond rules to use LLM reasoning,
+    enabling context-aware and domain-adaptive chart selection.
+
+Dash AI's distinctive contribution to this space is the combination of:
+  (a) Multi-source data ingestion with a unified adapter interface
+  (b) Statistical analysis with explicit anomaly flagging and trend detection
+  (c) LLM-driven chart selection with graceful rule-based fallback
+  (d) Real-time streaming overlaid on a statically-generated dashboard
+  (e) Conversational AI grounded in precise dashboard statistics
+  (f) One-click save, share, and PDF export
+
+
+5.5  ANOMALY DETECTION IN TIME-SERIES DATA
+-------------------------------------------------------
+
+Anomaly detection in IoT sensor streams is a well-studied problem. The
+taxonomy of anomaly types includes point anomalies (individual outliers),
+contextual anomalies (normal value, abnormal context), and collective anomalies
+(sequences that deviate from the norm).
+
+Chandola et al. (2009) provided a comprehensive survey of anomaly detection
+techniques, categorising them into statistical, proximity-based, information-
+theoretic, and spectral methods. Dash AI implements the simplest effective
+approach from this taxonomy: the z-score method (standard deviation threshold).
+
+A value v is flagged as anomalous if |v - μ| > 2.5σ, where μ is the mean
+and σ the standard deviation of the sensor time series. This threshold of 2.5σ
+corresponds to flagging values in the top/bottom ~1.2% of a Gaussian distribution
+— empirically a good balance between sensitivity and false-positive rate for IoT
+sensor data. The flagged points are rendered as red circles in Chart.js plots.
+
+More sophisticated methods — LSTM-based anomaly detection (Malhotra et al.,
+2015), Isolation Forest (Liu et al., 2008), or STL decomposition (Cleveland
+et al., 1990) — are natural future improvements, particularly for seasonal
+patterns (e.g., daily temperature cycles) where simple z-scores generate
+excessive false positives.
+
+The pattern detection logic in DataCleaner also identifies:
+  - Constant series (zero variance): indicates a stuck sensor or offline device
+  - Monotonic trends (linear regression slope): rising/falling sensor readings
+  - Boolean extremes (always ON or always OFF for the period): unusual device state
+  - Categorical mode concentration (≤8 unique string values): state-machine view
+
+
+5.6  REAL-TIME DATA STREAMING
+-------------------------------------------------------
+
+Real-time data delivery to browser clients is implemented via WebSockets —
+a full-duplex communication protocol over a single TCP connection, standardised
+by RFC 6455 (IETF, 2011). The Flask-SocketIO library (Grinberg, 2014–present)
+provides a Pythonic abstraction over the Socket.IO protocol, which adds
+namespace management, room-based broadcasting, automatic reconnection, and
+graceful HTTP long-poll fallback for environments where WebSockets are blocked.
+
+Earlier approaches to real-time browser updates include:
+  Server-Sent Events (SSE): One-directional HTTP stream. Simpler but cannot
+    handle bidirectional communication (needed for chat widget and subscribe/
+    unsubscribe control messages).
+  HTTP Long Polling: Client repeatedly polls with a timeout. High latency and
+    server resource overhead.
+  WebSockets: Lowest latency, lowest overhead, bidirectional. Standard choice
+    for IoT dashboards since 2014.
+
+Dash AI's streaming architecture is a hybrid:
+  - Historical data: fetched synchronously at dashboard generation time via REST
+  - Live updates: delivered asynchronously via Socket.IO every 3 seconds
+  - Update throttling: the browser maintains a 20-point rolling window per chart
+
+This hybrid approach provides the best of both worlds: a rich historical view
+from the AI pipeline, continuously augmented by live data without full
+re-generation of the dashboard or AI calls.
+
+The APScheduler background job that drives the live feed was fixed in this
+build to guard against the Werkzeug debug reloader double-start problem
+(see Section 12, Known Issue #2).
+
+
+================================================================================
+6. TECHNOLOGY STACK
+================================================================================
+
+  BACKEND
+  ────────────────────────────────────────────────────────────────
+  Language:         Python 3.9+
+  Web Framework:    Flask >= 3.0 (Blueprint routing, Jinja2 templating)
+  WebSocket:        Flask-SocketIO >= 5.3.6 (Socket.IO protocol server)
+  Task Scheduler:   APScheduler >= 3.10.4 (background interval jobs)
+  HTTP Client:      requests >= 2.31.0 (ThingsBoard API + Groq API calls)
+  DB Driver (PG):   psycopg2-binary >= 2.9.9 (PostgreSQL / Neon)
+  DB (local):       sqlite3 (Python standard library)
+  Password hashing: werkzeug.security (pbkdf2:sha256 / scrypt)
+  WSGI (prod):      gunicorn >= 21.2.0
+
+  AI SERVICES
+  ────────────────────────────────────────────────────────────────
+  Primary LLM:      Groq API — Mixtral-8x7b-32768 (chart selection)
+  Secondary LLM:    Groq API — llama-3.1-8b-instant (correlation + chat)
+  Fallback:         Rule-based Python (when Groq unavailable)
+
+  FRONTEND
+  ────────────────────────────────────────────────────────────────
+  Markup:           HTML5 (semantic elements, ARIA where applicable)
+  Styling:          Vanilla CSS3 (CSS custom properties, Grid, Flexbox)
+  Scripting:        Vanilla JavaScript ES2020 (async/await, modules)
+  Template engine:  Jinja2 (server-side, via Flask)
+  Charting:         Chart.js 4.4.0 (CDN — 14 chart types supported)
+  WebSocket:        Socket.IO 4.7.2 client (CDN)
+  PDF Export:       html2pdf.js 0.10.1 (CDN — html2canvas + jsPDF)
+  Typography:       Google Fonts — Sora (UI font) + JetBrains Mono (data)
+
+  INFRASTRUCTURE
+  ────────────────────────────────────────────────────────────────
+  Hosting:          Render.com (render.yaml configuration)
+  Database:         Neon.tech (serverless PostgreSQL) or local SQLite
+  Secrets:          .env file (manual parse, no python-dotenv dependency)
+  Python version:   3.11.0 (Render-pinned)
+  Package mgmt:     pip + requirements.txt
+
+  DATA SOURCE (Phase 1)
+  ────────────────────────────────────────────────────────────────
+  ThingsBoard REST API — authenticated via JWT Bearer token
+  Endpoints used:
+    POST /api/auth/login
+    GET  /api/auth/user
+    GET  /api/device/{id}
+    GET  /api/tenant/devices
+    GET  /api/customer/{id}/devices
+    GET  /api/plugins/telemetry/DEVICE/{id}/keys/timeseries
+    GET  /api/plugins/telemetry/DEVICE/{id}/keys/attributes
+    GET  /api/plugins/telemetry/DEVICE/{id}/values/timeseries
+    GET  /api/plugins/telemetry/DEVICE/{id}/values/attributes/{scope}
+
+
+================================================================================
+7. PROJECT FILE STRUCTURE
+================================================================================
+
+  Outhouse/
+  ├── app.py                   Flask app + Socket.IO + server entry point
+  ├── config.py                .env loading, API keys, presets, time ranges
+  ├── database.py              PostgreSQL/SQLite dual-mode DB adapter
+  ├── pipeline.py              AgentState TypedDict + run_pipeline()
+  ├── routes.py                All HTTP endpoints + WebSocket handlers
+  ├── requirements.txt         Python dependency list
+  ├── render.yaml              Render.com deployment manifest
+  ├── .env                     Secrets (gitignored)
+  ├── .gitignore               Python, secrets, DB, IDE exclusions
+  ├── dashboard.db             SQLite local dev database (gitignored)
+  ├── README.md                Project documentation
+  ├── content.txt              This report
+  │
+  ├── agents/
+  │   ├── __init__.py          Empty package marker
+  │   ├── data_fetcher.py      Agent 1: ThingsBoard API client (141 lines)
+  │   ├── data_cleaner.py      Agent 2: Stats + patterns + optional AI (240 lines)
+  │   ├── viz_recommender.py   Agent 3: Groq chart selection + fallback (112 lines)
+  │   └── dashboard_builder.py Agent 4: Chart.js config builder (252 lines)
+  │
+  └── templates/
+      ├── base.html            HTML shell, CSS design tokens, topbar (320 lines)
+      ├── landing.html         Public marketing homepage (422 lines)
+      ├── login.html           User authentication form (170 lines)
+      ├── register.html        User registration form (206 lines)
+      ├── dashboard.html       Main SPA — all 3 screens + JS (2820 lines)
+      └── error.html           Generic error display page (72 lines)
+
+  Total backend Python:   ~1,100 lines
+  Total frontend HTML/JS: ~3,700 lines
+  Total configuration:    ~70 lines
+
+
+================================================================================
+8. DETAILED MODULE ANALYSIS
+================================================================================
+
+8.1  CONFIGURATION — config.py (41 lines)
+-------------------------------------------------------
+
+Reads the .env file manually (no python-dotenv dependency) by splitting on
+the first "=" character and stripping comments. Falls back to os.environ for
+each key, so the same config works in cloud deployments (env vars) and
+local development (.env file).
+
+Exposed values:
+  GROQ_API_KEY   — Groq inference API key (optional; fallback charts used if absent)
+  DATABASE_URL   — Neon PostgreSQL DSN (empty string = SQLite mode)
+  FLASK_SECRET   — Session encryption key (random 48-char hex if not set)
+
+TB_PRESETS — 4 ThingsBoard server options presented in the UI:
+  Cloud     → https://thingsboard.cloud
+  Demo      → https://demo.thingsboard.io
+  Self      → (user enters URL)
+  PE/Edge   → (user enters URL)
+
+TIME_RANGES — 9 time window options:
+  1h, 6h, 24h, 3d, 7d, 30d, 3m, 6m, 1y
+  Each maps to (label, hours). get_time_bounds(rk) computes Unix ms timestamps.
+
+
+8.2  DATABASE LAYER — database.py (256 lines)
+-------------------------------------------------------
+
+Dual-mode adapter: checks DATABASE_URL at runtime to choose PostgreSQL or SQLite.
+Handles placeholder differences (%s vs ?), cursor factories (DictCursor vs Row),
+and DDL syntax (SERIAL vs INTEGER AUTOINCREMENT, ON CONFLICT vs INSERT OR REPLACE).
+
+Schema (4 tables):
+
+  users           id, email (UNIQUE), password_hash
+  sessions        id (12-char hex PK), created_at, tb_host, device_id, time_range
+  agent_logs      id, session_id, agent_name, status, message, created_at
+  dashboards      id, user_id (FK), name, config (JSON text), created_at,
+                  share_token (UNIQUE, 16-byte URL-safe random)
+
+Key functions:
+  init_db()               Creates tables on startup (idempotent)
+  log_agent()             Appends a log entry during pipeline execution
+  create_user()           Inserts user; returns False on duplicate email
+  save_session()          Upserts session record (preserves existing on conflict)
+  save_dashboard()        Insert-or-update a named dashboard; preserves share_token
+  get_dashboard_by_token() JOIN with users to include owner_email in response
+  delete_dashboard()      Owner-gated deletion
+
+
+8.3  PIPELINE ORCHESTRATOR — pipeline.py (47 lines)
+-------------------------------------------------------
+
+Defines AgentState (Python TypedDict) — the shared data contract between agents:
+
+  session_id, tb_host, tb_token, device_id, device_name, time_range
+  raw_data, cleaned_data, patterns, viz_recommendations, dashboard_data
+  errors, warnings, agent_statuses
+
+run_pipeline():
+  1. Generates session ID: MD5(token + device_id + current_time)[:12]
+  2. Persists session to DB
+  3. Initialises all agent statuses to "pending"
+  4. Calls: DataFetcher → DataCleaner → VizRecommender → DashboardBuilder
+  5. Returns complete AgentState
+
+Error propagation: each agent checks the previous agent's status before
+running. If the preceding agent errored, the current agent sets its own
+status to "skipped" and returns immediately. This prevents wasted computation
+on downstream agents when upstream data is unavailable.
+
+
+8.4  AGENT 1: DATA FETCHER — agents/data_fetcher.py (141 lines)
+-------------------------------------------------------
+
+The only Phase-1-specific agent. Its entire logic is ThingsBoard REST calls.
+
+Flow per device:
+  1. Resolve device name and type from /api/device/{id}
+  2. List available telemetry keys from /keys/timeseries
+  3. List attribute keys from /keys/attributes
+  4. Batch-fetch time-series for up to 20 keys (1000 points each, 60s timeout)
+  5. Fetch attributes from client + server + shared scopes
+  6. Combine into raw_data dict with optional device-name prefix for multi-device
+
+Error handling: HTTP 401 (token expired) → fatal & return. HTTP 404 (device
+not found) → log warning, skip that device. Timeout or ConnectionError → fatal.
+
+Contract output: raw_data dict (see Section 4.1 for full schema)
+
+FUTURE EXTENSION POINT: A new data source requires a new file in agents/,
+implementing the same function signature:
+  def agent_X_fetcher(state: AgentState) -> AgentState:
+  The function must populate state["raw_data"] with the universal schema.
+
+
+8.5  AGENT 2: DATA CLEANER — agents/data_cleaner.py (240 lines)
+-------------------------------------------------------
+
+Universal statistical analysis. Entirely data-source-agnostic.
+
+Type classification (_classify):
+  null, boolean (bool type or true/false/yes/no/on/off/0/1 strings),
+  numeric (float-parseable), json (dict-like string), string (everything else)
+
+Numeric analysis per key:
+  - Statistics: count, mean, min, max, variance, standard deviation
+  - Trend: linear regression slope → rising (>1%/step) / falling / stable
+  - Anomaly detection: z-score threshold 2.5σ → point anomaly flags
+  - Output slice: last 300 values + anomaly_flags boolean list
+
+Pattern generation:
+  trend     → rising/falling sensor identified with direction
+  anomaly   → count + timestamps of last 3 anomalous readings
+  constant  → std=0, sensor is stuck or reporting same value
+  status    → boolean always-ON or always-OFF
+  categorical → string sensor with ≤8 unique values lists all states
+
+JSON nested extraction:
+  Sensor values that are JSON objects (common in gateway devices that pack
+  multiple readings into one key) are automatically flattened:
+  "gps" → "gps.lat", "gps.lng" each become separate numeric timeseries.
+
+Unit heuristics (_unit):
+  16 keyword patterns detect physical units from key names:
+  temperature→°C, humidity→%, pressure→hPa, voltage→V, current→A,
+  power→W, energy→kWh, speed→m/s, CO2→ppm, particles→µg/m³,
+  signal→dBm, battery→%, frequency→Hz, light→lux, flow→L/min,
+  level→cm, pH→pH
+
+Optional AI pass (Groq llama-3.1-8b-instant):
+  If ≥2 numeric sensors and Groq is available, asks for cross-sensor
+  correlations in JSON format. Parsed with regex r'\[[\s\S]*\]' and
+  appended to patterns list. Silently ignored on failure.
+
+
+8.6  AGENT 3: VIZ RECOMMENDER — agents/viz_recommender.py (112 lines)
+-------------------------------------------------------
+
+Selects optimal chart types using Groq Mixtral-8x7b-32768 (LLM) or deterministic
+fallback. Produces a list of 6-12 chart specifications.
+
+Supported chart types (14):
+  line, bar, doughnut, pie, area, stacked_bar, combo, bubble, scatter,
+  radar, polarArea, kpi, boolean_status, string_freq
+
+Groq system prompt encodes rules for each chart type:
+  - line: time-series numeric trends, anomaly tracking
+  - bar: comparing averages across sensors
+  - doughnut/pie: on/off ratios, categorical proportions
+  - area: volume/cumulative metrics
+  - stacked_bar: parts-of-whole across sensors
+  - combo: mixed line+bar for 2 correlated sensors
+  - bubble: 3 sensors as (x, y, radius)
+  - scatter: 2 correlated sensors
+  - radar/polarArea: 3-6 sensors as multi-dimensional profile
+  - kpi: single most critical numeric reading
+  - boolean_status: on/off with percentage bar
+  - string_freq: horizontal bar of value frequencies
+
+User prompt includes all sensor statistics + patterns + device context.
+Response must be raw JSON array only. Regex fallback extracts array if extra
+text is present. Invalid chart types are filtered out.
+
+Fallback (_fallback_viz):
+  Deterministic rule-based selection when Groq is unavailable:
+  - Line chart per numeric sensor (up to 4)
+  - Radar if ≥3 numeric sensors
+  - Bar of averages if ≥2 numeric sensors
+  - Boolean_status per boolean sensor (up to 3)
+  - String_freq for first string sensor
+  - KPI for first numeric sensor
+  Never fails. Always produces a usable dashboard.
+
+
+8.7  AGENT 4: DASHBOARD BUILDER — agents/dashboard_builder.py (252 lines)
+-------------------------------------------------------
+
+Translates all pipeline outputs into a final JSON structure renderable by the
+browser without any further processing.
+
+KPI cards (up to 8):
+  Each numeric sensor → { key, label, avg, min, max, std, trend,
+                          anomaly_count, count, unit, min_ts, max_ts, raw_data }
+  raw_data = last 60 (timestamp, value) pairs for the detail modal.
+  min_ts/max_ts = exact timestamps of extreme values for AI chat precision.
+
+Boolean cards:
+  Each boolean sensor → { key, label, true_count, false_count,
+                          true_pct, last_value, count }
+
+String cards:
+  Each string sensor → { key, label, latest, top-6 by frequency,
+                          total, unique counts }
+
+Chart blocks (_build_chartjs):
+  Line/Area/Bar/Stacked/Combo/Scatter:
+    Up to 4 datasets per chart. Timestamps as "DD/MM HH:MM" labels.
+    Anomalous points rendered in red (#ef4444) with +4px radius.
+    For >80 points, base point radius = 0 (performance).
+    Color palette: #3b82f6, #ef4444, #10b981, #f59e0b, #8b5cf6,
+                   #14b8a6, #f43f5e, #6366f1
+  Doughnut/Pie: boolean (green/gray) or top-6 string values (multi-color)
+  Radar/PolarArea: ≥3 sensors normalised to 0-100% scale
+  Bubble: exactly 3 sensors as (x, y, radius), radius scaled 5-20px
+
+Attribute table:
+  All device attributes with pretty label, value (truncated to 200 chars),
+  scope tag (client/server/shared/device), and type classification.
+
+
+8.8  HTTP ROUTES — routes.py (423 lines)
+-------------------------------------------------------
+
+All routes registered as a Flask Blueprint named "main".
+
+Authentication middleware:
+  @login_required → checks session["user_id"], redirects to /login with ?next=
+
+Route summary:
+  GET  /                 → landing or redirect to /dashboard
+  GET/POST /login        → Dash AI user authentication
+  GET/POST /register     → Dash AI user registration
+  GET  /logout           → clear session, redirect /
+  GET  /dashboard        → render main SPA (authenticated)
+  POST /api/login        → validate ThingsBoard credentials, return JWT
+  POST /api/devices      → list ThingsBoard devices (tenant or customer)
+  POST /run              → execute 4-agent pipeline, return dashboard JSON
+  GET  /logs/<sid>       → retrieve agent_logs for a session
+  GET/POST /api/dashboards     → list or create saved dashboards
+  GET/DELETE /api/dashboards/<id> → read or delete one dashboard
+  GET  /share/<token>    → render shared read-only dashboard (public)
+  GET  /api/shared/<token>   → full dashboard JSON for shared view
+  POST /api/chat         → conversational AI, returns reply from Groq
+
+Socket.IO events:
+  connect             → no-op
+  disconnect          → remove from active_sessions
+  subscribe_telemetry → store { host, token, device_id } in active_sessions
+
+APScheduler:
+  fetch_live_telemetry() runs every 3 seconds.
+  Polls ThingsBoard for each active session (2-second timeout per device).
+  Emits 'telemetry_update' via Socket.IO to the relevant client SID.
+  Guard: starts only when WERKZEUG_RUN_MAIN != 'false' (prevents double-start
+  in Werkzeug debug mode reloader).
+
+
+8.9  FRONTEND APPLICATION — dashboard.html (2820 lines)
+-------------------------------------------------------
+
+Single-page application implemented in vanilla HTML/CSS/JavaScript, served
+as a Jinja2 template. Extends base.html.
+
+Screen system:
+  CSS .screen { display: none } / .screen.active { display: flex }
+  JavaScript showScreen(id) switches between screens.
+
+SCREEN 1 — CONNECT:
+  Jinja2-injected preset URLs, time ranges.
+  Two auth mode tabs: Email+Password, or JWT token paste.
+  Preset dropdown shows Cloud/Demo/Self-hosted/PE options.
+  Demo credentials note shown only when demo preset selected.
+
+SCREEN 2 — DEVICE:
+  Device list populated asynchronously via POST /api/devices.
+  Client-side device list cache (S.cachedDevices) avoids redundant API calls.
+  Manual Device ID fallback for devices not returned by the API.
+  Time range selector.
+  "Saved Dashboards" modal button for loading previous configurations.
+
+SCREEN 3 — DASHBOARD:
+  Sidebar (256px, sticky): device info card, 4-step pipeline indicator
+    with animated blinking dots, monospace activity log, action buttons.
+  Main area: dashboard header, summary strip, KPI grid, bool grid,
+    string grid, AI highlights grid, chart grid, patterns box, attr table.
+  Charts enabled for in-browser type switching without server round-trips.
+  Save/Share/Export buttons in dashboard header (hidden in shared view).
+  Shared view: single-column layout, sidebar hidden, read-only notice.
+
+Modals:
+  Saved Dashboards: lists all user dashboards with name, date, Open button.
+  KPI Detail: full-screen Chart.js line chart of last 60 raw data points.
+    Color: blue (stable), green (rising), red (falling).
+
+Chat Widget:
+  Fixed bottom-right bubble button (blue, 56px circle).
+  Slide-up panel (380×500px, cubic-bezier spring animation).
+  Messages: AI = white card left-aligned, User = blue card right-aligned.
+  Context: all of lastGeneratedData passed to /api/chat, including all KPI
+  statistics with timestamps. Last 5 message pairs kept for continuity.
+
+Key JavaScript state:
+  S = { host, token, deviceId, deviceName, timeRange, cachedDevices }
+  activeCharts = []     Chart.js instances (for destruction/live update)
+  lastGeneratedData     Dashboard JSON payload (for modal + chat context)
+  currentShareToken     For share URL generation after save
+  chatContextHistory    [ {role, content} ] last 20 messages
+
+Key JavaScript functions:
+  doLogin()             POST /api/login, advance to screen 2
+  loadDeviceScreen()    POST /api/devices (cached), populate dropdown
+  generateDashboard()   POST /run, fetch logs, call renderDashboard()
+  renderDashboard()     Build full HTML, instantiate Chart.js, setup WebSocket
+  changeChartType()     Live chart type switching with format conversion
+  openDetailChart()     Open KPI detail modal with Chart.js line chart
+  saveCurrentDashboard() Merge current chart states, POST /api/dashboards
+  shareCurrentDashboard() Copy share URL to clipboard
+  exportCurrentDashboardPDF() html2pdf export of #dash-main div
+  handleLiveTelemetry() Append WebSocket data to activeCharts (rolling 20pts)
+  sendChatMessage()     POST /api/chat with full context, render reply
+
+
+8.10 SUPPORTING TEMPLATES
+-------------------------------------------------------
+
+base.html (320 lines):
+  CSS design tokens as custom properties. Font imports. Global button + input
+  styles. Sticky glassmorphism topbar with conditional nav links (user email
+  + sign-out if logged in; sign-in + register if not). Three Jinja2 blocks:
+  extra_css, content, scripts.
+
+landing.html (422 lines):
+  Hero section with viewport-filling headline (clamp 3rem-5rem).
+  Stats strip: 10K+ devices, 500M+ points, 99.9% uptime, 30+ countries.
+  6-card features grid (3-col, collapses to 1 on mobile).
+  CTA section: "Book a free demo" button.
+
+login.html (170 lines):
+  Centered auth card (max 420px). Email + password form. Error banner.
+  "Don't have an account" link. Focus ring + hover animations.
+
+register.html (206 lines):
+  Same structure as login, with email + new-password fields.
+
+error.html (72 lines):
+  Generic error page with emoji icon, message, return-to-home button.
+  Used for: invalid share tokens (404 from /share/<bad-token>).
+
+
+================================================================================
+9. END-TO-END DATA FLOW (CURRENT IMPLEMENTATION)
+================================================================================
+
+Step 1:  User opens app → GET / → landing or redirect to /dashboard
+Step 2:  User registers → POST /register → DB INSERT users → redirect /login
+Step 3:  User logs in → POST /login → check_password_hash → session set
+Step 4:  GET /dashboard → dashboard.html rendered (Screen 1 active)
+         Jinja2 injects: tb_presets, time_ranges, groq_configured, user_email
+Step 5:  User selects preset, enters credentials → doLogin()
+         POST /api/login { tb_host, email, password }
+         → tb_login() POST ThingsBoard/api/auth/login → JWT returned
+         → Response: { token, email, name }
+         → Screen 2 shown, S.token stored
+Step 6:  loadDeviceScreen() → POST /api/devices { tb_host, token }
+         → GET ThingsBoard/api/tenant/devices → device list
+         → Dropdown populated, result cached in S.cachedDevices
+Step 7:  User selects device + time range → generateDashboard()
+         POST /run { tb_host, tb_token, device_id, time_range }
+Step 8:  Server pipeline (synchronous, ~5-30s):
+         DataFetcher:     6-8 ThingsBoard API calls per device
+         DataCleaner:     Pure Python; optional Groq call for correlations
+         VizRecommender:  Groq Mixtral-8x7b call (or fallback)
+         DashboardBuilder: Pure Python config assembly
+         All agents log to DB via log_agent()
+Step 9:  /run returns dashboard_data JSON → renderDashboard()
+         Parallel: GET /logs/{session_id} → activity log populated
+Step 10: renderDashboard() builds HTML string → sets dash-main innerHTML
+         Creates Chart.js instance for each canvas
+         Initiates Socket.IO connection → subscribe_telemetry emitted
+Step 11: Every 3 seconds: background thread polls ThingsBoard
+         → socketio.emit 'telemetry_update' to connected client
+         → browser handleLiveTelemetry():
+              Append to chart datasets → rolling 20-point window → chart.update
+              Append timestamped log entry to activity log
+Step 12: User clicks Save → saveCurrentDashboard()
+         Merges current chart type state → POST /api/dashboards {name, config}
+         → DB UPSERT dashboard → response: { share_token }
+Step 13: User clicks Share → copies /share/{token} to clipboard
+Step 14: Recipient visits /share/{token}
+         → GET /share/{token}: render dashboard.html with metadata only
+         → DOMContentLoaded: GET /api/shared/{token} (full JSON)
+         → renderDashboard() in read-only mode (no save/share/export buttons)
+
+
+================================================================================
+10. SECURITY ARCHITECTURE
+================================================================================
+
+User authentication:
+  Flask session (server-side cookie). Werkzeug password hashing
+  (pbkdf2:sha256 or scrypt). @login_required decorator gates all
+  authenticated endpoints.
+
+ThingsBoard token handling:
+  JWT stored only in browser JavaScript (S.token). Never written to the
+  Dash AI database. Forwarded to ThingsBoard only in the X-Authorization
+  header of API calls. In-memory only in active_sessions for WebSocket
+  polling; purged on disconnect.
+
+Data storage:
+  Device telemetry is NOT stored in the Dash AI database. The dashboard_data
+  JSON (aggregated statistics + chart configs) is stored only when the user
+  explicitly saves a dashboard. Raw sensor values are never persisted.
+
+XSS prevention:
+  All user-supplied strings rendered in template literals or innerHTML pass
+  through esc(s): &→&amp; <→&lt; >→&gt; "→&quot;
+
+Share token security:
+  secrets.token_urlsafe(16) ≈ 128 bits of entropy. Impossible to enumerate.
+  No expiry or revocation mechanism currently (see Known Issues).
+
+SSL:
+  HTTPS used for all Groq API calls (enforced by requests).
+  ThingsBoard calls: verify=True by default, falls back to verify=False
+  on SSLError for self-signed certs (usability trade-off).
+
+CSRF:
+  No CSRF token implementation. All state-modifying endpoints are JSON POST,
+  which provides partial protection (browsers enforce same-origin for
+  non-CORS fetches). Full CSRF protection is a planned improvement.
+
+Session secret:
+  FLASK_SECRET from .env or Render env var. If missing, os.urandom(24).hex()
+  is generated per-process (sessions lost on restart). Production deployments
+  should always set an explicit secret.
+
+
+================================================================================
+11. DEPLOYMENT ARCHITECTURE
+================================================================================
+
+Development:
+  python app.py → Flask-SocketIO dev server on port 5050, debug=True
+  SQLite (dashboard.db) for local database
+  .env file for secrets
+
+Production (Render.com):
+  gunicorn app:app (single WSGI worker)
+  PostgreSQL via Neon serverless (DATABASE_URL env var)
+  FLASK_SECRET generated by Render (stable across deploys)
+  GROQ_API_KEY set manually in Render dashboard
+  PYTHON_VERSION = 3.11.0
+
+render.yaml:
+  type: web, name: dash-ai, env: python
+  buildCommand: pip install -r requirements.txt
+  startCommand: gunicorn app:app
+
+Known production issue: bare gunicorn does not support WebSockets.
+For live telemetry to work in production, the start command must be:
+  gunicorn --worker-class eventlet -w 1 app:app
+and eventlet must be added to requirements.txt.
+
+Alternatively, Render supports a "Background Worker" service type, which
+could host the APScheduler loop as a separate process, decoupling it from
+the web server lifecycle and improving reliability.
+
+
+================================================================================
+12. KNOWN ISSUES & LIMITATIONS
+================================================================================
+
+Issue 1: Sidebar logout button broken
+  The "→ Sign Out" button in the dashboard sidebar calls onclick="logout()"
+  but no logout() JavaScript function is defined in the script block.
+  The browser will throw ReferenceError. The topbar sign-out link (<a href="/logout">)
+  defined in base.html works correctly.
+  Fix: Change to onclick="window.location.href='/logout'"
+
+Issue 2: APScheduler double-start in debug mode (RESOLVED)
+  Previously scheduler.start() ran at module import time. Werkzeug's debug
+  reloader forks the process; the scheduler started in both parent and child,
+  causing doubled background threads that blocked the response queue during
+  logout (producing noticeable delay).
+  Fix applied: guarded with os.environ.get('WERKZEUG_RUN_MAIN') != 'false'
+
+Issue 3: Polling timeout reduced to 2s (APPLIED)
+  ThingsBoard telemetry poll timeout reduced from 5s to 2s to reduce the
+  maximum blocking time of background threads on the response queue.
+
+Issue 4: Gunicorn + WebSocket incompatibility (PRODUCTION)
+  render.yaml uses bare gunicorn app:app. Socket.IO WebSocket support requires
+  an event-loop-based worker class (eventlet or gevent). Without this, WebSocket
+  connections fall back to HTTP long polling or fail entirely in production.
+
+Issue 5: No CSRF protection
+  State-changing endpoints (/api/dashboards POST/DELETE, /run) have no CSRF
+  tokens. Risk is partially mitigated by JSON content-type requirements.
+
+Issue 6: Synchronous pipeline
+  POST /run blocks the Flask worker for up to 30+ seconds on slow ThingsBoard
+  instances or complex datasets. Under high concurrency, this exhausts workers.
+  Production fix: background task queue (Celery/RQ) with SSE progress stream.
+
+Issue 7: Telemetry key limit
+  Only 20 telemetry keys fetched per device (API batch call). Devices with
+  more sensors will have some silently ignored. A paginated multi-request
+  approach would resolve this.
+
+Issue 8: No share link expiry or revocation
+  Share tokens are permanent unless the dashboard is deleted. No per-link
+  access control, view count, or time-to-live mechanism.
+
+Issue 9: Database connection pooling absent
+  Each DB operation opens and closes a new connection. Adequate for low traffic,
+  but a connection pool is required for production scale.
+
+Issue 10: FLASK_SECRET regenerated on restart
+  If FLASK_SECRET is absent from the .env file, os.urandom generates a new
+  secret each restart, invalidating all existing user sessions.
+
+Issue 11: Chat context overflow
+  For dashboards with many sensors or large pattern lists, the /api/chat
+  payload may approach Groq's context window limit, potentially truncating
+  important statistics.
+
+
+================================================================================
+13. FUTURE ROADMAP
+================================================================================
+
+PHASE 2 — Local File Upload (next priority)
+  - Upload CSV, Excel, JSON, Parquet, SQLite
+  - Client-side drag-and-drop with file type validation
+  - Server-side column type detection + timestamp auto-detection
+  - No external credentials required → zero-barrier onboarding
+
+PHASE 3 — Multi-Platform Cloud API Adapters
+  - InfluxDB (open-source, enterprise, cloud)
+  - AWS IoT SiteWise, Core
+  - Azure IoT Hub
+  - Google Cloud IoT
+  - TimescaleDB
+
+PHASE 4 — Generic & Indirect Sources
+  - Custom REST API adapter (user-defined URL + JSON path)
+  - MQTT subscriber mode
+  - Cloud storage sync (S3, GCS, Azure Blob → CSV/Parquet)
+  - Webhook/push ingest endpoint
+
+PHASE 5 — Enterprise
+  - OPC-UA for industrial SCADA/PLC/DCS
+  - SQL database (SQLAlchemy DSN + query builder)
+  - DataDog/New Relic/Splunk metric APIs
+
+TECHNICAL IMPROVEMENTS
+  - Async pipeline processing (Celery/RQ) with SSE progress streaming
+  - WebSocket production fix (eventlet worker for gunicorn)
+  - Connection pooling (psycopg2.pool.ThreadedConnectionPool)
+  - CSRF protection (Flask-WTF)
+  - Rate limiting on /run and /api/chat (Flask-Limiter)
+  - Share link expiry and revocation
+  - Refresh token support for ThingsBoard JWT expiry
+
+FEATURE IMPROVEMENTS
+  - Dashboard templates (pre-built layouts for common device types)
+  - Custom alerting: email/webhook when anomaly detected
+  - Scheduled auto-refresh with differential update
+  - CSV / Excel export in addition to PDF
+  - Multi-dashboard comparison view
+  - Organisation accounts (team-shared dashboards)
+  - Public gallery of community-shared dashboards
+
+
+================================================================================
+14. REFERENCES
+================================================================================
+
+[1]  Botta, A., de Donato, W., Persico, V., & Pescapé, A. (2016).
+     Integration of cloud computing and Internet of Things: A survey.
+     Future Generation Computer Systems, 56, 684-700.
+     https://doi.org/10.1016/j.future.2015.09.021
+
+[2]  Ngu, A. H., Gutierrez, M., Metsis, V., Nepal, S., & Sheng, Q. Z. (2017).
+     IoT Middleware: A Survey on Issues and Enabling Technologies.
+     IEEE Internet of Things Journal, 4(1), 1-20.
+     https://doi.org/10.1109/JIOT.2016.2615180
+
+[3]  ThingsBoard Inc. (2023).
+     ThingsBoard Technical Documentation — REST API Reference.
+     Retrieved from https://thingsboard.io/docs/reference/rest-api/
+
+[4]  Mackinlay, J. (1986).
+     Automating the design of graphical presentations of relational information.
+     ACM Transactions on Graphics (TOG), 5(2), 110-141.
+     https://doi.org/10.1145/22949.22950
+
+[5]  Wongsuphasawat, K., Moritz, D., Anand, A., Mackinlay, J., Howe, B., &
+     Heer, J. (2016). Voyager: Exploratory Analysis via Faceted Browsing of
+     Visualization Recommendations. IEEE Transactions on Visualization and
+     Computer Graphics, 22(1), 649-658.
+     https://doi.org/10.1109/TVCG.2015.2467191
+
+[6]  Hu, K., Bakker, M. A., Li, S., Kraska, T., & Hidalgo, C. (2019).
+     VizML: A Machine Learning Approach to Visualization Recommendation.
+     In Proceedings of the 2019 CHI Conference on Human Factors in Computing
+     Systems (CHI '19). ACM, Paper 128.
+     https://doi.org/10.1145/3290605.3300358
+
+[7]  Narechania, A., Srinivasan, A., & Stasko, J. (2021).
+     NL4DV: A Toolkit for Generating Analytic Specifications for Data
+     Visualization from Natural Language Queries.
+     IEEE Transactions on Visualization and Computer Graphics, 27(2), 369-379.
+     https://doi.org/10.1109/TVCG.2020.3030378
+
+[8]  OpenAI. (2023).
+     GPT-4 Technical Report. arXiv preprint arXiv:2303.08774.
+     https://arxiv.org/abs/2303.08774
+
+[9]  Cheng, L., et al. (2023).
+     Is Your LLM Secretly a World Model and Does It Matter?
+     Proceedings of the AAAI 2023 Workshop on AI-Augmented Human-Computer
+     Interaction.
+
+[10] Ma, Y., Cao, Y., Pal, A., Guo, C., Veeraraghavan, M., & Stoica, I. (2023).
+     Large Language Models as Tool Makers. arXiv:2305.17126.
+     https://arxiv.org/abs/2305.17126
+
+[11] Groq Inc. (2024).
+     Groq LPU Inference Engine — Performance Benchmarks.
+     Retrieved from https://groq.com/technology/
+
+[12] Chandola, V., Banerjee, A., & Kumar, V. (2009).
+     Anomaly Detection: A Survey.
+     ACM Computing Surveys, 41(3), 1-58.
+     https://doi.org/10.1145/1541880.1541882
+
+[13] Malhotra, P., Vig, L., Shroff, G., & Agarwal, P. (2015).
+     Long Short Term Memory Networks for Anomaly Detection in Time Series.
+     In Proceedings of ESANN 2015, 89-94.
+
+[14] Liu, F. T., Ting, K. M., & Zhou, Z. H. (2008).
+     Isolation Forest.
+     In Proceedings of the 8th IEEE International Conference on Data Mining
+     (ICDM 2008), 413-422. https://doi.org/10.1109/ICDM.2008.17
+
+[15] Cleveland, R. B., Cleveland, W. S., McRae, J. E., & Terpenning, I. (1990).
+     STL: A Seasonal-Trend Decomposition Procedure Based on Loess.
+     Journal of Official Statistics, 6(1), 3-73.
+
+[16] IETF. (2011).
+     RFC 6455: The WebSocket Protocol.
+     Retrieved from https://tools.ietf.org/html/rfc6455
+
+[17] Grinberg, M. (2014–present).
+     Flask-SocketIO Documentation.
+     Retrieved from https://flask-socketio.readthedocs.io/
+
+[18] Grafana Labs. (2014–present).
+     Grafana — The Open Observability Platform.
+     Retrieved from https://grafana.com/
+
+[19] Elastic N.V. (2013–present).
+     Kibana — Explore, Visualize, and Discover Data.
+     Retrieved from https://www.elastic.co/kibana
+
+[20] Statista Research Department. (2024).
+     Number of IoT Connected Devices Worldwide 2019–2030.
+     Retrieved from https://www.statista.com/statistics/1183457/
+     iot-connected-devices-worldwide/
+
+[21] Mistral AI. (2023).
+     Mixtral of Experts. arXiv:2401.04088.
+     https://arxiv.org/abs/2401.04088
+
+[22] Meta AI. (2023).
+     Llama 2: Open Foundation and Fine-Tuned Chat Models. arXiv:2307.09288.
+     https://arxiv.org/abs/2307.09288
+
+[23] Chartjs.org. (2023).
+     Chart.js v4.4.0 Documentation.
+     Retrieved from https://www.chartjs.org/docs/latest/
+
+[24] AWS. (2021).
+     AWS IoT SiteWise Documentation.
+     Retrieved from https://docs.aws.amazon.com/iot-sitewise/
+
+[25] Microsoft Azure. (2017–present).
+     Azure IoT Hub Documentation.
+     Retrieved from https://learn.microsoft.com/en-us/azure/iot-hub/
+
+================================================================================
+END OF REPORT
+================================================================================
