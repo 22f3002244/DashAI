@@ -1,3 +1,4 @@
+import sys
 from flask import Flask
 from flask_socketio import SocketIO
 from config import FLASK_SECRET, GROQ_API_KEY
@@ -19,9 +20,14 @@ from routes import init_socketio
 init_socketio(socketio)
 
 if __name__ == "__main__":
-    print("\n" + "─"*44)
+    # Ensure UTF-8 output on Windows terminals
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    sep = "-" * 44
+    groq_status = "OK (configured)" if GROQ_API_KEY and GROQ_API_KEY != "your_groq_api_key_here" else "NOT SET (add key to .env)"
+    print(f"\n{sep}")
     print("  ThingsBoard AI Dashboard (with Real-time)")
     print("  http://localhost:5050")
-    print(f"  Groq AI: {'✓ configured' if GROQ_API_KEY and GROQ_API_KEY != 'your_groq_api_key_here' else '✗ not set (add key to .env)'}")
-    print("─"*44 + "\n")
+    print(f"  Groq AI: {groq_status}")
+    print(f"{sep}\n")
     socketio.run(app, debug=True, port=5050, allow_unsafe_werkzeug=True)
