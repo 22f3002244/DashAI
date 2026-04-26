@@ -13,7 +13,7 @@ if os.path.exists(_env_path):
 
 GROQ_API_KEY = _ENV.get("GROQ_API_KEY", os.environ.get("GROQ_API_KEY", ""))
 DATABASE_URL = _ENV.get("DATABASE_URL", os.environ.get("DATABASE_URL", ""))
-FLASK_SECRET = _ENV.get("FLASK_SECRET", os.urandom(24).hex())
+FLASK_SECRET = _ENV.get("FLASK_SECRET", os.environ.get("FLASK_SECRET", os.urandom(24).hex()))
 
 TB_PRESETS = [
     {"key": "cloud", "label": "ThingsBoard Cloud",       "url": "https://thingsboard.cloud",   "desc": "Official cloud — create a free account at thingsboard.cloud"},
