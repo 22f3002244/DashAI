@@ -13,3 +13,4 @@ apscheduler>=3.10.4
 # Optional extras
 # python-dotenv>=1.0.0   # .env is loaded manually, but dotenv works too
 gunicorn>=21.2.0         # for production deployment
+eventlet>=0.33.3         # for async socketio workers on gunicorn
