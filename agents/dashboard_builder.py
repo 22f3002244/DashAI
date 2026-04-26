@@ -125,6 +125,8 @@ def agent_dashboard_builder(state):
         num   = cd.get("numeric",{})
         bool_ = cd.get("boolean",{})
         str_  = cd.get("string",{})
+        start_ts = raw.get("start_ts")   # full selected range lower bound (ms)
+        end_ts   = raw.get("end_ts")     # full selected range upper bound (ms)
 
         def _find_extremes(key):
             """Return (min_val, min_ts, max_val, max_ts) from the raw cleaned numeric data."""
@@ -146,18 +148,26 @@ def agent_dashboard_builder(state):
             
             raw_data = []
             if k in num and "timestamps" in num[k] and "values" in num[k]:
-                # Slice to last 60 points so detailed view has a good history
-                ts_list = num[k]["timestamps"][-60:]
-                v_list = num[k]["values"][-60:]
-                raw_data = list(zip(ts_list, v_list))
-                
+                ts_all = num[k]["timestamps"]
+                v_all  = num[k]["values"]
+                total  = len(ts_all)
+                MAX_PTS = 300
+                if total <= MAX_PTS:
+                    indices = range(total)
+                else:
+                    step = (total - 1) / (MAX_PTS - 1)
+                    indices = [round(i * step) for i in range(MAX_PTS)]
+                raw_data = [(ts_all[i], v_all[i]) for i in indices]
+
             kpi_cards.append({
                 "key": k, "label": _pretty(k),
                 "avg": v["avg"], "min": v["min"], "max": v["max"], "std": v["std"],
                 "trend": v.get("trend", "stable"), "anomaly_count": v.get("anomaly_count", 0),
                 "count": v["count"], "unit": v.get("unit", ""),
                 "min_ts": mn_ts, "max_ts": mx_ts,
-                "raw_data": raw_data
+                "raw_data": raw_data,
+                "range_start_ts": start_ts,   # full selected range — locks chart X-axis
+                "range_end_ts":   end_ts,
             })
         kpi_cards = kpi_cards[:8]
 

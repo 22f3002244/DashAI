@@ -1987,30 +1987,38 @@
     const k = lastGeneratedData.kpi_cards[idx];
     document.getElementById('kpi-detail-title').textContent = k.label + ' Detail (' + k.count + ' points)';
     document.getElementById('kpi-detail-modal').classList.add('active');
-    
+
     const canvas = document.getElementById('kpi-detail-canvas');
     const ctx = canvas.getContext('2d');
-    
+
     // Destroy existing chart if any
     if (window.kpiDetailChart) window.kpiDetailChart.destroy();
-    
+
     if (!k.raw_data || !k.raw_data.length) {
-        // Fallback for older saved dashboards
         alert("Detailed historical data not available for this dashboard export.");
         hideKpiDetailModal();
         return;
     }
 
-    const rawVals = k.raw_data.map(p => p[1]);
-    const rawLabels = k.raw_data.map(p => {
-       const d = new Date(p[0]);
-       return d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-    });
+    // Format a timestamp (ms) → "Mon DD, HH:MM"
+    const fmt = ts => new Date(ts).toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'});
 
-    let color = '#2563eb'; // blue
-    if (k.trend === 'falling') color = '#dc2626'; // red
-    if (k.trend === 'rising') color = '#16a34a'; // green
-    
+    let rawVals   = k.raw_data.map(p => p[1]);
+    let rawLabels = k.raw_data.map(p => fmt(p[0]));
+
+    // Pad with null sentinels at range boundaries so the X-axis always spans
+    // the full selected time window (inactive periods show as visible gaps).
+    if (k.range_start_ts && k.range_end_ts) {
+      const startLabel = fmt(k.range_start_ts);
+      const endLabel   = fmt(k.range_end_ts);
+      if (rawLabels[0] !== startLabel)                     { rawLabels.unshift(startLabel); rawVals.unshift(null); }
+      if (rawLabels[rawLabels.length - 1] !== endLabel)    { rawLabels.push(endLabel);      rawVals.push(null);    }
+    }
+
+    let color = '#2563eb';
+    if (k.trend === 'falling') color = '#dc2626';
+    if (k.trend === 'rising')  color = '#16a34a';
+
     window.kpiDetailChart = new Chart(ctx, {
       type: 'line',
       data: {
@@ -2021,21 +2029,24 @@
           borderColor: color,
           backgroundColor: color + '20',
           borderWidth: 2,
-          pointRadius: 2,
+          pointRadius: rawVals.length > 100 ? 0 : 2,
           pointHoverRadius: 6,
           fill: true,
-          tension: 0.3
+          tension: 0.3,
+          spanGaps: false   // show gaps for inactive periods
         }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { 
-            legend: { display: false }, 
-            tooltip: { enabled: true, mode: 'index', intersect: false } 
+        plugins: {
+            legend: { display: false },
+            tooltip: { enabled: true, mode: 'index', intersect: false,
+              callbacks: { label: ctx => ctx.parsed.y === null ? '(no data)' : `${k.label}: ${ctx.parsed.y}${k.unit ? ' '+k.unit : ''}` }
+            }
         },
         scales: {
-          x: { display: true },
+          x: { display: true, ticks: { font: { size: 10 }, maxTicksLimit: 12 } },
           y: { display: true, suggestedMin: k.min - (k.max-k.min)*0.1, suggestedMax: k.max + (k.max-k.min)*0.1 }
         },
         interaction: { mode: 'index', intersect: false }

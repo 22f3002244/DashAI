@@ -67,12 +67,34 @@ def agent_data_fetcher(state):
             if tele_keys:
                 batch = tele_keys[:20]
                 from config import TIME_RANGES
+
+                # Calculate a bucket interval that yields ~300 evenly-spaced
+                # points across the full selected time range.  This ensures the
+                # chart X-axis always spans the complete window even when the
+                # device was only active for part of it.
+                range_ms    = end_ts - start_ts
+                target_pts  = 300
+                interval_ms = max(range_ms // target_pts, 1000)  # at least 1 s
+
+                # Pass 1 – aggregated (AVG) so points are spread across the window
                 r4 = tb_get(host, token, f"/api/plugins/telemetry/DEVICE/{dev_id}/values/timeseries",
                             params={"keys": ",".join(batch),
                                     "startTs": start_ts, "endTs": end_ts,
-                                    "limit": 1000, "agg": "NONE"}, timeout=60)
+                                    "limit": 50000,
+                                    "agg": "AVG",
+                                    "interval": interval_ms}, timeout=60)
+
+                # Pass 2 – fall back to raw NONE if aggregation returns nothing
+                agg_data = r4.json() if r4.status_code == 200 else {}
+                if not agg_data or not any(agg_data.values()):
+                    r4 = tb_get(host, token, f"/api/plugins/telemetry/DEVICE/{dev_id}/values/timeseries",
+                                params={"keys": ",".join(batch),
+                                        "startTs": start_ts, "endTs": end_ts,
+                                        "limit": 50000, "agg": "NONE"}, timeout=60)
+                    agg_data = r4.json() if r4.status_code == 200 else {}
+
                 if r4.status_code == 200:
-                    telemetry = r4.json()
+                    telemetry = agg_data
                     for k, v in telemetry.items():
                         new_key = f"{prefix}{k}"
                         all_telemetry[new_key] = v
